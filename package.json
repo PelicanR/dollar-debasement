@@ -1,0 +1,12 @@
+{
+  "name": "dollar-debasement",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "USD Debasement Monitor — data backend",
+  "scripts": {
+    "fetch": "node scripts/fetch-data.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}

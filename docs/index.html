@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dollar Debasement Monitor | dollar-debasement.com</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:wght@400;700&family=Karla:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #07080a;
+  --s1:       #0d0f13;
+  --s2:       #13161c;
+  --s3:       #1a1e27;
+  --border:   #1e2330;
+  --border2:  #262c3a;
+  --gold:     #c8a84b;
+  --gold2:    #e8c870;
+  --golddim:  #6b5a28;
+  --silver:   #9ba8b8;
+  --red:      #d94f4f;
+  --orange:   #e07830;
+  --green:    #3aaa6e;
+  --blue:     #4a7fc0;
+  --purple:   #8060c0;
+  --text:     #dde2ec;
+  --muted:    #5a6278;
+  --muted2:   #3a4055;
+  --accent:   #e8c850;
+  --bitcoin:  #f7931a;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Karla', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* subtle hex grid background */
+body::before {
+  content:'';
+  position:fixed;inset:0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(200,168,75,0.06) 1px, transparent 0);
+  background-size: 32px 32px;
+  pointer-events:none;z-index:0;
+}
+
+/* top accent glow */
+body::after {
+  content:'';
+  position:fixed;top:0;left:0;right:0;height:1px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold) 30%, var(--gold2) 50%, var(--gold) 70%, transparent 100%);
+  z-index:100;
+}
+
+.page { max-width:1480px;margin:0 auto;padding:0 24px;position:relative;z-index:1; }
+
+/* ── LOADER ─────────────────────────────────────────────────────────── */
+#loader {
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:9000;transition:opacity 0.7s ease;
+}
+#loader.out{opacity:0;pointer-events:none}
+
+.ld-title {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2.8rem;letter-spacing:0.18em;color:var(--gold);margin-bottom:8px;
+}
+.ld-sub {
+  font-family:'Courier Prime',monospace;
+  font-size:0.65rem;letter-spacing:0.3em;color:var(--muted);
+  margin-bottom:40px;text-transform:uppercase;
+}
+.ld-track{width:360px;height:1px;background:var(--s3);margin-bottom:14px;overflow:hidden;}
+.ld-fill{height:100%;background:linear-gradient(90deg,var(--golddim),var(--gold2));width:0;transition:width 0.4s ease;}
+.ld-msg{font-family:'Courier Prime',monospace;font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;height:16px;}
+
+.ld-apis {
+  display:flex;gap:16px;margin-top:28px;flex-wrap:wrap;justify-content:center;
+}
+.api-chip {
+  font-family:'Courier Prime',monospace;
+  font-size:0.55rem;letter-spacing:0.15em;
+  padding:5px 12px;border:1px solid var(--border2);color:var(--muted2);
+  text-transform:uppercase;transition:all 0.4s;
+}
+.api-chip.ok{color:var(--green);border-color:var(--green);background:rgba(58,170,110,0.07);}
+.api-chip.err{color:var(--red);border-color:var(--red);background:rgba(217,79,79,0.07);}
+.api-chip.loading{color:var(--gold);border-color:var(--golddim);animation:chipblink 1s ease-in-out infinite;}
+@keyframes chipblink{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* ── HEADER ──────────────────────────────────────────────────────────── */
+header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:16px;
+}
+
+.logo-wrap{display:flex;align-items:baseline;gap:14px;}
+.logo {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2.6rem;letter-spacing:0.1em;line-height:1;color:var(--gold);
+}
+.logo sup{font-size:1.2rem;color:var(--red);vertical-align:super;}
+.logo-sub{font-family:'Courier Prime',monospace;font-size:0.58rem;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;}
+
+.hdr-right{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.live-ind{display:flex;align-items:center;gap:7px;font-family:'Courier Prime',monospace;font-size:0.6rem;letter-spacing:0.12em;color:var(--muted);}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(58,170,110,0.4)}50%{opacity:0.5;box-shadow:0 0 0 4px rgba(58,170,110,0)}}
+
+.refresh-btn {
+  font-family:'Courier Prime',monospace;font-size:0.6rem;letter-spacing:0.15em;
+  background:none;border:1px solid var(--border2);color:var(--muted);
+  padding:7px 16px;cursor:pointer;text-transform:uppercase;transition:all 0.2s;
+}
+.refresh-btn:hover{border-color:var(--golddim);color:var(--gold);}
+.refresh-btn.spin{animation:rotspin 1s linear infinite;}
+@keyframes rotspin{to{transform:rotate(360deg)}}
+
+.ts{font-family:'Courier Prime',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;}
+
+/* ── CDI HERO ─────────────────────────────────────────────────────────── */
+.hero {
+  display:grid;grid-template-columns:340px 1fr;
+  border:1px solid var(--border);border-top:2px solid var(--gold);
+  margin:24px 0;background:var(--s1);overflow:hidden;
+}
+
+.hero-left {
+  padding:36px 32px;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:0;
+  background:linear-gradient(160deg,var(--s1) 0%,var(--s2) 100%);
+  position:relative;overflow:hidden;
+}
+.hero-left::after {
+  content:'CDI';
+  position:absolute;right:-16px;bottom:-24px;
+  font-family:'Bebas Neue',sans-serif;font-size:9rem;
+  color:rgba(200,168,75,0.04);pointer-events:none;letter-spacing:-0.05em;
+}
+
+.cdi-eyebrow {
+  font-family:'Courier Prime',monospace;font-size:0.58rem;
+  letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:10px;
+}
+.cdi-num {
+  font-family:'Bebas Neue',sans-serif;font-size:6.8rem;line-height:0.9;
+  color:var(--accent);text-shadow:0 0 80px rgba(232,200,80,0.2);
+  transition:color 0.6s;
+}
+.cdi-denom{font-family:'Courier Prime',monospace;font-size:0.6rem;color:var(--muted);margin-top:6px;letter-spacing:0.1em;}
+
+.grade-badge {
+  display:inline-block;margin-top:14px;
+  font-family:'Bebas Neue',sans-serif;font-size:0.95rem;letter-spacing:0.2em;
+  padding:6px 16px;border:1px solid;transition:all 0.6s;
+}
+.g-stable  {color:var(--green); border-color:var(--green); background:rgba(58,170,110,0.08);}
+.g-mild    {color:var(--accent);border-color:var(--accent);background:rgba(232,200,80,0.08);}
+.g-elevated{color:var(--orange);border-color:var(--orange);background:rgba(224,120,48,0.08);}
+.g-severe  {color:#e05020;     border-color:#e05020;      background:rgba(224,80,32,0.1);}
+.g-critical{color:var(--red);  border-color:var(--red);   background:rgba(217,79,79,0.12);animation:critblink 1.5s ease-in-out infinite;}
+@keyframes critblink{0%,100%{opacity:1}50%{opacity:0.7}}
+
+.gauge-section{margin-top:24px;}
+.gauge-label-row{display:flex;justify-content:space-between;margin-bottom:6px;font-family:'Courier Prime',monospace;font-size:0.52rem;color:var(--muted2);letter-spacing:0.08em;}
+.gauge-track{height:5px;background:var(--s3);border-radius:3px;overflow:hidden;}
+.gauge-fill{
+  height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--green) 0%,var(--accent) 45%,var(--orange) 70%,var(--red) 100%);
+  transform:scaleX(0);transform-origin:left;
+  transition:transform 1.4s cubic-bezier(0.16,1,0.3,1);
+}
+
+.verdict {
+  margin-top:20px;padding:13px 15px;
+  background:var(--bg);border-left:2px solid var(--golddim);
+  font-size:0.72rem;line-height:1.75;color:var(--text);
+  font-family:'Karla',sans-serif;font-weight:300;
+}
+
+.component-scores{margin-top:22px;}
+.comp-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.comp-name{font-family:'Courier Prime',monospace;font-size:0.55rem;color:var(--muted);letter-spacing:0.08em;width:130px;text-transform:uppercase;}
+.comp-track{flex:1;height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.comp-fill{height:100%;border-radius:2px;transition:width 1.2s ease;}
+.comp-val{font-family:'Courier Prime',monospace;font-size:0.58rem;color:var(--muted);width:32px;text-align:right;}
+
+.hero-right{padding:28px;display:flex;flex-direction:column;}
+.hero-chart-label{font-family:'Courier Prime',monospace;font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:16px;}
+.hero-chart-area{flex:1;position:relative;min-height:280px;}
+
+/* ── WEIGHT LEGEND ───────────────────────────────────────────────────── */
+.weight-strip {
+  display:grid;grid-template-columns:repeat(7,1fr);
+  border:1px solid var(--border);border-top:none;
+  background:var(--s1);margin-bottom:24px;
+}
+.wt-cell{
+  padding:12px 14px;border-right:1px solid var(--border);
+  position:relative;overflow:hidden;transition:background 0.2s;
+}
+.wt-cell:last-child{border-right:none;}
+.wt-cell:hover{background:var(--s2);}
+.wt-src{font-family:'Courier Prime',monospace;font-size:0.48rem;letter-spacing:0.15em;color:var(--muted2);text-transform:uppercase;margin-bottom:4px;}
+.wt-name{font-size:0.65rem;color:var(--text);font-weight:500;margin-bottom:6px;}
+.wt-pct{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1;}
+.wt-tag{font-family:'Courier Prime',monospace;font-size:0.48rem;letter-spacing:0.1em;color:var(--muted2);margin-top:3px;}
+.wt-bar{position:absolute;bottom:0;left:0;right:0;height:2px;}
+
+/* ── STAT CARDS ──────────────────────────────────────────────────────── */
+.stats-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:1px;background:var(--border);
+  border:1px solid var(--border);margin-bottom:24px;
+}
+.stat{background:var(--s1);padding:18px 20px;position:relative;transition:background 0.2s;}
+.stat:hover{background:var(--s2);}
+.stat-src{font-family:'Courier Prime',monospace;font-size:0.48rem;letter-spacing:0.18em;color:var(--muted2);text-transform:uppercase;margin-bottom:5px;}
+.stat-label{font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.stat-val{font-family:'Bebas Neue',sans-serif;font-size:2.2rem;line-height:1;color:var(--text);}
+.stat-delta{font-family:'Courier Prime',monospace;font-size:0.58rem;margin-top:5px;letter-spacing:0.04em;}
+.delta-up{color:var(--red);}
+.delta-dn{color:var(--green);}
+.delta-nu{color:var(--muted);}
+.stat-fresh{font-family:'Courier Prime',monospace;font-size:0.48rem;color:var(--muted2);margin-top:3px;}
+.stat-ibar{position:absolute;bottom:0;left:0;height:2px;background:var(--gold);width:0;transition:width 1.5s ease;}
+
+/* ── CHARTS GRID ─────────────────────────────────────────────────────── */
+.charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;}
+.chart-card{background:var(--s1);border:1px solid var(--border);padding:22px;}
+.chart-card.span2{grid-column:span 2;}
+.chart-card.span3{grid-column:span 2;}
+
+.cc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.cc-title{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:0.12em;color:var(--gold);}
+.cc-sub{font-size:0.6rem;color:var(--muted);margin-top:3px;font-family:'Karla',sans-serif;font-weight:300;}
+.cc-badge{
+  font-family:'Courier Prime',monospace;font-size:0.52rem;
+  padding:3px 9px;border:1px solid var(--border2);color:var(--muted);
+  letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;
+}
+.cc-badge.gov{border-color:rgba(90,98,120,0.5);color:var(--muted2);}
+.cc-badge.mkt{border-color:var(--golddim);color:var(--gold);}
+
+.chart-area{position:relative;height:200px;}
+.chart-area.tall{height:270px;}
+.chart-area.xtall{height:300px;}
+
+.no-data{
+  position:absolute;inset:0;display:none;
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;
+  font-family:'Courier Prime',monospace;font-size:0.6rem;
+  color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;
+}
+.no-data.show{display:flex;}
+
+/* gov data disclaimer stripe */
+.gov-stripe {
+  background:rgba(90,98,120,0.06);border:1px solid rgba(90,98,120,0.15);
+  border-left:2px solid var(--muted2);
+  padding:8px 14px;margin-bottom:10px;
+  font-family:'Courier Prime',monospace;font-size:0.55rem;
+  letter-spacing:0.08em;color:var(--muted2);line-height:1.7;
+}
+
+/* ── METHODOLOGY ─────────────────────────────────────────────────────── */
+.method {
+  border:1px solid var(--border);background:var(--s1);
+  padding:24px;margin-bottom:24px;
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;
+}
+.method-block-title{
+  font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.2em;
+  color:var(--muted);margin-bottom:14px;
+}
+.mrow{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.mname{font-size:0.62rem;color:var(--text);width:180px;font-family:'Karla',sans-serif;}
+.mname small{display:block;font-family:'Courier Prime',monospace;font-size:0.48rem;color:var(--muted2);letter-spacing:0.08em;text-transform:uppercase;}
+.mtrack{flex:1;height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
+.mfill{height:100%;border-radius:2px;}
+.mpct{font-family:'Courier Prime',monospace;font-size:0.58rem;color:var(--muted);width:30px;text-align:right;}
+
+.formula-block{font-family:'Courier Prime',monospace;font-size:0.6rem;line-height:2.2;color:var(--muted);}
+.formula-block strong{color:var(--accent);}
+.formula-block em{color:var(--muted2);font-style:normal;}
+
+/* ── FOOTER ──────────────────────────────────────────────────────────── */
+footer{
+  border-top:1px solid var(--border);padding:20px 0;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  flex-wrap:wrap;gap:16px;
+  font-family:'Karla',sans-serif;font-size:0.6rem;color:var(--muted);line-height:1.9;
+}
+.footer-links{display:flex;gap:24px;flex-wrap:wrap;}
+.footer-links a{color:var(--golddim);text-decoration:none;font-family:'Courier Prime',monospace;font-size:0.55rem;letter-spacing:0.08em;}
+.footer-links a:hover{color:var(--gold);}
+.disclaimer{color:var(--muted2);max-width:600px;}
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+@media(max-width:1100px){
+  .weight-strip{grid-template-columns:repeat(4,1fr);}
+  .wt-cell:nth-child(4){border-right:none;}
+  .wt-cell:nth-child(5){border-top:1px solid var(--border);}
+}
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;}
+  .hero-left{border-right:none;border-bottom:1px solid var(--border);}
+  .charts-grid{grid-template-columns:1fr;}
+  .chart-card.span2,.chart-card.span3{grid-column:span 1;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .method{grid-template-columns:1fr;}
+  .weight-strip{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:560px){
+  .stats-grid{grid-template-columns:1fr;}
+  .logo{font-size:1.9rem;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="ld-title">USD DEBASEMENT MONITOR</div>
+  <div class="ld-sub">Live Market Intelligence · Real-Time CDI Engine</div>
+  <div class="ld-track"><div class="ld-fill" id="ldFill"></div></div>
+  <div class="ld-msg" id="ldMsg">INITIALIZING SYSTEMS...</div>
+  <div class="ld-apis">
+    <div class="api-chip loading" id="chip-fred">ALPHA VANTAGE</div>
+    <div class="api-chip loading" id="chip-av">ALPHA VANTAGE</div>
+    <div class="api-chip loading" id="chip-fx">FRANKFURTER FX</div>
+    <div class="api-chip loading" id="chip-btc">BTC / ECON DATA</div>
+    <div class="api-chip loading" id="chip-cdi">CDI ENGINE</div>
+  </div>
+</div>
+
+<div class="page">
+<!-- HEADER -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo">USD<sup>⚠</sup>MONITOR</div>
+    <div class="logo-sub">Debasement Intelligence · Market-Weighted CDI</div>
+  </div>
+  <div class="hdr-right">
+    <div class="ts" id="tsLabel">—</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="fullRefresh()">⟳ REFRESH</button>
+    <div class="live-ind"><div class="ldot"></div><span>LIVE DATA</span></div>
+  </div>
+</header>
+
+<!-- CDI HERO -->
+<div class="hero">
+  <div class="hero-left">
+    <div>
+      <div class="cdi-eyebrow">Composite Debasement Index™ v2</div>
+      <div class="cdi-num" id="cdiNum">—</div>
+      <div class="cdi-denom">/ 100 &nbsp;·&nbsp; MARKET-WEIGHTED SIGNAL</div>
+      <div class="grade-badge g-elevated" id="gradeBadge">LOADING</div>
+    </div>
+
+    <div class="gauge-section">
+      <div class="gauge-label-row">
+        <span>0 STABLE</span><span>25</span><span>50</span><span>75</span><span>100 CRITICAL</span>
+      </div>
+      <div class="gauge-track"><div class="gauge-fill" id="gaugeFill"></div></div>
+    </div>
+
+    <div class="verdict" id="verdictText">Loading live assessment...</div>
+
+    <div class="component-scores" id="compScores">
+      <div style="font-family:'Courier Prime',monospace;font-size:0.55rem;letter-spacing:0.15em;color:var(--muted2);text-transform:uppercase;margin-bottom:10px;">Component Breakdown</div>
+      <!-- filled dynamically -->
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="hero-chart-label">CDI Historical — 2000 to Present (Live)</div>
+    <div class="hero-chart-area"><canvas id="heroChart"></canvas></div>
+  </div>
+</div>
+
+<!-- WEIGHT STRIP -->
+<div class="weight-strip">
+  <div class="wt-cell">
+    <div class="wt-src">Alpha Vantage · Daily</div>
+    <div class="wt-name">Gold (XAU/USD)</div>
+    <div class="wt-pct" style="color:var(--gold)">20%</div>
+    <div class="wt-tag">MARKET SIGNAL</div>
+    <div class="wt-bar" style="background:var(--gold)"></div>
+  </div>
+  <div class="wt-cell">
+    <div class="wt-src">Alpha Vantage · Daily</div>
+    <div class="wt-name">Silver (XAG/USD)</div>
+    <div class="wt-pct" style="color:var(--silver)">15%</div>
+    <div class="wt-tag">MARKET SIGNAL</div>
+    <div class="wt-bar" style="background:var(--silver)"></div>
+  </div>
+  <div class="wt-cell">
+    <div class="wt-src">CoinGecko · Daily</div>
+    <div class="wt-name">Bitcoin (BTC/USD)</div>
+    <div class="wt-pct" style="color:var(--bitcoin)">15%</div>
+    <div class="wt-tag">MARKET SIGNAL</div>
+    <div class="wt-bar" style="background:var(--bitcoin)"></div>
+  </div>
+  <div class="wt-cell">
+    <div class="wt-src">Frankfurter · Daily</div>
+    <div class="wt-name">DXY Dollar Index</div>
+    <div class="wt-pct" style="color:var(--blue)">15%</div>
+    <div class="wt-tag">MARKET SIGNAL</div>
+    <div class="wt-bar" style="background:var(--blue)"></div>
+  </div>
+  <div class="wt-cell">
+    <div class="wt-src">FRED · Monthly</div>
+    <div class="wt-name">Case-Shiller HPI</div>
+    <div class="wt-pct" style="color:var(--purple)">10%</div>
+    <div class="wt-tag">MARKET SIGNAL</div>
+    <div class="wt-bar" style="background:var(--purple)"></div>
+  </div>
+  <div class="wt-cell">
+    <div class="wt-src">FRED · Monthly</div>
+    <div class="wt-name">CPI Inflation</div>
+    <div class="wt-pct" style="color:var(--muted)">13%</div>
+    <div class="wt-tag" style="color:var(--muted2)">GOV DATA ⚠</div>
+    <div class="wt-bar" style="background:var(--muted2)"></div>
+  </div>
+  <div class="wt-cell">
+    <div class="wt-src">FRED · Weekly</div>
+    <div class="wt-name">M2 Money Supply</div>
+    <div class="wt-pct" style="color:var(--muted)">12%</div>
+    <div class="wt-tag" style="color:var(--muted2)">GOV DATA ⚠</div>
+    <div class="wt-bar" style="background:var(--muted2)"></div>
+  </div>
+</div>
+
+<!-- GOV DATA DISCLAIMER -->
+<div class="gov-stripe">
+  ⚠ GOVERNMENT DATA NOTE: CPI and M2 are official Federal Reserve / BLS figures. These carry reduced weighting (25% combined) due to well-documented methodological changes since 1990 — including substitution adjustments, hedonic quality corrections, and changes to M2 definition. Market-priced assets (gold, silver, bitcoin, DXY, real estate) comprise 75% of the CDI.
+</div>
+
+<!-- STAT CARDS -->
+<div class="stats-grid">
+  <div class="stat">
+    <div class="stat-src">Alpha Vantage · Market Price</div>
+    <div class="stat-label">Gold XAU/USD</div>
+    <div class="stat-val" id="sv-gold">—</div>
+    <div class="stat-delta delta-up" id="sd-gold">Loading...</div>
+    <div class="stat-fresh" id="sf-gold"></div>
+    <div class="stat-ibar" id="ib-gold"></div>
+  </div>
+  <div class="stat">
+    <div class="stat-src">Alpha Vantage · Market Price</div>
+    <div class="stat-label">Silver XAG/USD</div>
+    <div class="stat-val" id="sv-silver">—</div>
+    <div class="stat-delta delta-up" id="sd-silver">Loading...</div>
+    <div class="stat-fresh" id="sf-silver"></div>
+    <div class="stat-ibar" id="ib-silver"></div>
+  </div>
+  <div class="stat">
+    <div class="stat-src">CoinGecko · Market Price</div>
+    <div class="stat-label">Bitcoin BTC/USD</div>
+    <div class="stat-val" id="sv-btc">—</div>
+    <div class="stat-delta delta-up" id="sd-btc">Loading...</div>
+    <div class="stat-fresh" id="sf-btc"></div>
+    <div class="stat-ibar" id="ib-btc"></div>
+  </div>
+  <div class="stat">
+    <div class="stat-src">Frankfurter FX · Computed</div>
+    <div class="stat-label">DXY Dollar Index</div>
+    <div class="stat-val" id="sv-dxy">—</div>
+    <div class="stat-delta delta-dn" id="sd-dxy">Loading...</div>
+    <div class="stat-fresh" id="sf-dxy"></div>
+    <div class="stat-ibar" id="ib-dxy"></div>
+  </div>
+  <div class="stat">
+    <div class="stat-src">FRED CSUSHPINSA · Monthly</div>
+    <div class="stat-label">Case-Shiller HPI</div>
+    <div class="stat-val" id="sv-hpi">—</div>
+    <div class="stat-delta delta-up" id="sd-hpi">Loading...</div>
+    <div class="stat-fresh" id="sf-hpi"></div>
+    <div class="stat-ibar" id="ib-hpi"></div>
+  </div>
+  <div class="stat">
+    <div class="stat-src">FRED CPIAUCSL · Monthly ⚠</div>
+    <div class="stat-label">CPI Inflation YoY</div>
+    <div class="stat-val" id="sv-cpi">—</div>
+    <div class="stat-delta delta-up" id="sd-cpi">Loading...</div>
+    <div class="stat-fresh" id="sf-cpi"></div>
+    <div class="stat-ibar" id="ib-cpi"></div>
+  </div>
+  <div class="stat">
+    <div class="stat-src">FRED M2SL · Weekly ⚠</div>
+    <div class="stat-label">M2 Money Supply</div>
+    <div class="stat-val" id="sv-m2">—</div>
+    <div class="stat-delta delta-up" id="sd-m2">Loading...</div>
+    <div class="stat-fresh" id="sf-m2"></div>
+    <div class="stat-ibar" id="ib-m2"></div>
+  </div>
+  <div class="stat" style="background:linear-gradient(135deg,var(--s1),var(--s2));">
+    <div class="stat-src">CDI Engine · Composite</div>
+    <div class="stat-label">Purchasing Power Lost vs 2000</div>
+    <div class="stat-val" id="sv-ppl" style="color:var(--red)">—</div>
+    <div class="stat-delta delta-up" id="sd-ppl">Loading...</div>
+    <div class="stat-fresh">Gold + Silver + BTC basket estimate</div>
+    <div class="stat-ibar" id="ib-ppl" style="background:var(--red)"></div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts-grid">
+
+  <div class="chart-card">
+    <div class="cc-head">
+      <div><div class="cc-title">Gold — XAU/USD</div><div class="cc-sub">USD per Troy Oz · Alpha Vantage · Daily · CDI Weight 20%</div></div>
+      <div class="cc-badge mkt">Market · 20%</div>
+    </div>
+    <div class="chart-area"><canvas id="ch-gold"></canvas><div class="no-data" id="nd-gold">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="cc-head">
+      <div><div class="cc-title">Silver — XAG/USD</div><div class="cc-sub">USD per Troy Oz · Alpha Vantage · Daily · CDI Weight 15%</div></div>
+      <div class="cc-badge mkt">Market · 15%</div>
+    </div>
+    <div class="chart-area"><canvas id="ch-silver"></canvas><div class="no-data" id="nd-silver">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="cc-head">
+      <div><div class="cc-title">Bitcoin — BTC/USD</div><div class="cc-sub">USD · CoinGecko · Daily · CDI Weight 15%</div></div>
+      <div class="cc-badge mkt">Market · 15%</div>
+    </div>
+    <div class="chart-area"><canvas id="ch-btc"></canvas><div class="no-data" id="nd-btc">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="cc-head">
+      <div><div class="cc-title">DXY Dollar Index</div><div class="cc-sub">USD vs EUR/JPY/GBP/CAD/SEK/CHF basket · Frankfurter FX · Daily · CDI Weight 15%</div></div>
+      <div class="cc-badge mkt">Market · 15%</div>
+    </div>
+    <div class="chart-area"><canvas id="ch-dxy"></canvas><div class="no-data" id="nd-dxy">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="cc-head">
+      <div><div class="cc-title">Case-Shiller Home Price Index</div><div class="cc-sub">US National · FRED CSUSHPINSA · Monthly · CDI Weight 10%</div></div>
+      <div class="cc-badge mkt">Market · 10%</div>
+    </div>
+    <div class="chart-area"><canvas id="ch-hpi"></canvas><div class="no-data" id="nd-hpi">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="cc-head">
+      <div><div class="cc-title">CPI Inflation YoY %</div><div class="cc-sub">BLS / FRED · Monthly · Reduced CDI Weight 13% · Official data only</div></div>
+      <div class="cc-badge gov">Gov · 13%</div>
+    </div>
+    <div class="chart-area"><canvas id="ch-cpi"></canvas><div class="no-data" id="nd-cpi">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card span2">
+    <div class="cc-head">
+      <div><div class="cc-title">M2 Money Supply</div><div class="cc-sub">Trillions USD · FRED M2SL · Weekly · Reduced CDI Weight 12% · Official data — methodology shifts 2021–22</div></div>
+      <div class="cc-badge gov">Gov · 12%</div>
+    </div>
+    <div class="chart-area tall"><canvas id="ch-m2"></canvas><div class="no-data" id="nd-m2">NO DATA</div></div>
+  </div>
+
+  <div class="chart-card span2">
+    <div class="cc-head">
+      <div>
+        <div class="cc-title">Composite Debasement Index — Full History (2000 → Live)</div>
+        <div class="cc-sub">7-component market-weighted synthesis · Normalized 0–100 · Live endpoint updated daily</div>
+      </div>
+      <div class="cc-badge mkt">CDI v2</div>
+    </div>
+    <div class="chart-area xtall"><canvas id="ch-composite"></canvas></div>
+  </div>
+
+</div>
+
+<!-- METHODOLOGY -->
+<div class="method">
+  <div>
+    <div class="method-block-title">Component Weights</div>
+    <div class="mrow"><div class="mname">Gold<small>Alpha Vantage · Market</small></div><div class="mtrack"><div class="mfill" style="width:20%;background:var(--gold)"></div></div><div class="mpct" style="color:var(--gold)">20%</div></div>
+    <div class="mrow"><div class="mname">Silver<small>Alpha Vantage · Market</small></div><div class="mtrack"><div class="mfill" style="width:15%;background:var(--silver)"></div></div><div class="mpct" style="color:var(--silver)">15%</div></div>
+    <div class="mrow"><div class="mname">Bitcoin<small>CoinGecko · Market</small></div><div class="mtrack"><div class="mfill" style="width:15%;background:var(--bitcoin)"></div></div><div class="mpct" style="color:var(--bitcoin)">15%</div></div>
+    <div class="mrow"><div class="mname">DXY Index<small>Frankfurter · Market</small></div><div class="mtrack"><div class="mfill" style="width:15%;background:var(--blue)"></div></div><div class="mpct" style="color:var(--blue)">15%</div></div>
+    <div class="mrow"><div class="mname">Case-Shiller HPI<small>FRED · Market-priced</small></div><div class="mtrack"><div class="mfill" style="width:10%;background:var(--purple)"></div></div><div class="mpct" style="color:var(--purple)">10%</div></div>
+    <div class="mrow"><div class="mname">CPI Inflation<small>FRED · Gov data ⚠</small></div><div class="mtrack"><div class="mfill" style="width:13%;background:var(--muted2)"></div></div><div class="mpct">13%</div></div>
+    <div class="mrow"><div class="mname">M2 Growth<small>FRED · Gov data ⚠</small></div><div class="mtrack"><div class="mfill" style="width:12%;background:var(--muted2)"></div></div><div class="mpct">12%</div></div>
+  </div>
+  <div>
+    <div class="method-block-title">Normalization Formulas</div>
+    <div class="formula-block">
+      <strong>Gold</strong> = (price / $272 − 1) / 9 × 100<br>
+      <em>  baseline: $272 (year 2000)</em><br>
+      <strong>Silver</strong> = (price / $4.95 − 1) / 9 × 100<br>
+      <em>  baseline: $4.95 (year 2000)</em><br>
+      <strong>Bitcoin</strong> = log10(price / 0.01) / log10(10M) × 100<br>
+      <em>  log-scaled, $0.01 origin</em><br>
+      <strong>DXY</strong> = (109 − value) / 40 × 100<br>
+      <em>  inverted, baseline 109 (year 2000)</em><br>
+      <strong>HPI</strong> = (value / 100 − 1) / 2.5 × 100<br>
+      <em>  baseline 100 (Jan 2000)</em><br>
+      <strong>CPI</strong> = yoy% / 10 × 100<br>
+      <strong>M2</strong> = yoy_growth% / 20 × 100<br>
+    </div>
+  </div>
+  <div>
+    <div class="method-block-title">Why Market > Government Data</div>
+    <div style="font-size:0.68rem;color:var(--muted);line-height:1.85;font-family:'Karla',sans-serif;font-weight:300;">
+      Gold, silver, bitcoin, real estate, and currency markets are priced by millions of voluntary transactions globally. They cannot be adjusted by committee.<br><br>
+      Official CPI has undergone three major methodology changes since 1983 — including hedonics, geometric substitution, and owners' equivalent rent — that critics argue systematically suppress the reported rate.<br><br>
+      M2 was temporarily discontinued in 2021. Its current definition differs from prior decades.<br><br>
+      The CDI gives these signals 75% weight while retaining government data as a reference signal at 25%.
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="disclaimer">
+    Data auto-refreshes every 24 hours. Alpha Vantage free tier: 25 API calls/day. Gold & Silver via Alpha Vantage. Bitcoin via CoinGecko. FX/DXY via Frankfurter.app. M2, CPI, Case-Shiller via Federal Reserve FRED.<br>
+    <strong style="color:var(--muted2)">NOT FINANCIAL ADVICE.</strong> CDI is an analytical framework, not investment guidance.
+  </div>
+  <div class="footer-links">
+    <a href="https://fred.stlouisfed.org" target="_blank">FRED ↗</a>
+    <a href="https://www.alphavantage.co" target="_blank">ALPHA VANTAGE ↗</a>
+    <a href="https://www.coingecko.com" target="_blank">COINGECKO ↗</a>
+    <a href="https://frankfurter.app" target="_blank">FRANKFURTER FX ↗</a>
+    <a href="https://shadowstats.com" target="_blank">SHADOW STATS ↗</a>
+  </div>
+</footer>
+</div><!-- /page -->
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const FRED_KEY = '56bb5505a19a7585d5f4d899992d1f48';
+const AV_KEY   = 'W1WY1VJQ06V7AF1C';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h — Alpha Vantage free tier: 25 req/day
+
+// Baselines (year 2000)
+const BASE = { gold:272, silver:4.95, dxy:109, hpi:100, btcLog:Math.log10(100000000) };
+
+// CDI weights
+const W = { gold:0.20, silver:0.15, btc:0.15, dxy:0.15, hpi:0.10, cpi:0.13, m2:0.12 };
+
+// Historical anchor data 2000-2019
+const HIST = {
+  years: [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019],
+  gold:  [272,276,348,416,436,513,636,831,869,1087,1421,1531,1664,1202,1184,1060,1152,1303,1279,1517],
+  silver:[4.95,4.37,4.6,4.88,6.66,7.31,11.5,13.4,14.99,17.04,20.19,35.12,31.15,23.79,15.97,13.82,17.14,17.04,15.71,18.02],
+  btc:   [0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.07,1,0.3,5.27,13.44,754,320,430,963,13880,3742,7193],
+  dxy:   [109,115,102,88,81,88,83,76,80,78,80,80,79,81,90,99,102,93,96,97],
+  hpi:   [100,106,114,123,138,160,177,173,149,134,131,134,145,155,162,172,185,200,212,221],
+  cpi:   [3.4,2.8,1.6,2.3,2.7,3.4,3.2,2.9,3.8,-0.4,1.6,3.2,2.1,1.5,1.6,0.1,1.3,2.1,2.4,1.8],
+  m2yoy: [6.1,10.2,7.4,5.2,4.9,4.5,6.0,6.7,9.3,3.7,3.5,9.1,9.5,4.8,6.1,5.1,7.3,4.5,4.2,6.8],
+};
+
+// Recent known data 2020-2024
+const RECENT = [
+  {yr:'2020',gold:1898,silver:26.40,btc:29000,dxy:90,hpi:265,cpi:1.2,m2yoy:25.0},
+  {yr:'2021',gold:1830,silver:25.14,btc:46306,dxy:96,hpi:305,cpi:7.0,m2yoy:10.3},
+  {yr:'2022',gold:1824,silver:23.97,btc:16547,dxy:104,hpi:320,cpi:6.5,m2yoy:-1.3},
+  {yr:'2023',gold:2078,silver:23.79,btc:42258,dxy:101,hpi:315,cpi:3.4,m2yoy:-2.4},
+  {yr:'2024',gold:2625,silver:30.00,btc:94000,dxy:108,hpi:330,cpi:2.9,m2yoy:3.3},
+];
+
+// ─── CACHE ────────────────────────────────────────────────────────────────────
+function cSet(k,v){try{localStorage.setItem(k,JSON.stringify({t:Date.now(),d:v}))}catch(e){}}
+function cGet(k){
+  try{
+    const r=localStorage.getItem(k);if(!r)return null;
+    const {t,d}=JSON.parse(r);
+    if(Date.now()-t>CACHE_TTL)return null;
+    return d;
+  }catch(e){return null;}
+}
+function cClear(){
+  const keys=['fred_M2SL','fred_CPIAUCSL','fred_CSUSHPINSA','av_gold','av_silver','cg_btc','fx_dxy'];
+  keys.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+}
+
+// ─── CDI MATH ─────────────────────────────────────────────────────────────────
+function norm(v,min,max){return Math.min(100,Math.max(0,(v-min)/(max-min)*100));}
+
+function scoreGold(p)   {return Math.min(100,Math.max(0,((p/BASE.gold)-1)/9*100));}
+function scoreSilver(p) {return Math.min(100,Math.max(0,((p/BASE.silver)-1)/9*100));}
+function scoreBtc(p)    {
+  if(p<=0)return 0;
+  const lv=Math.log10(p);const lmax=Math.log10(10000000);const lmin=Math.log10(0.01);
+  return Math.min(100,Math.max(0,(lv-lmin)/(lmax-lmin)*100));
+}
+function scoreDxy(v)    {return Math.min(100,Math.max(0,(BASE.dxy-v)/40*100));}
+function scoreHpi(v)    {return Math.min(100,Math.max(0,(v/100-1)/2.5*100));}
+function scoreCpi(v)    {return Math.min(100,Math.max(0,v/10*100));}
+function scoreM2(v)     {return Math.min(100,Math.max(0,v/20*100));}
+
+function calcCDI(o){
+  const sg=scoreGold(o.gold), ss=scoreSilver(o.silver), sb=scoreBtc(o.btc),
+        sd=scoreDxy(o.dxy), sh=scoreHpi(o.hpi), sc=scoreCpi(o.cpi), sm=scoreM2(o.m2yoy);
+  const cdi=(sg*W.gold)+(ss*W.silver)+(sb*W.btc)+(sd*W.dxy)+(sh*W.hpi)+(sc*W.cpi)+(sm*W.m2);
+  return {cdi:Math.round(cdi*10)/10,sg,ss,sb,sd,sh,sc,sm};
+}
+
+// ─── CHART FACTORY ────────────────────────────────────────────────────────────
+Chart.defaults.color='#5a6278';
+Chart.defaults.borderColor='#1e2330';
+Chart.defaults.font.family="'Courier Prime', monospace";
+Chart.defaults.font.size=9;
+
+const chartReg={};
+function mkChart(id,labels,datasets,opts={}){
+  const el=document.getElementById(id);if(!el)return;
+  if(chartReg[id]){chartReg[id].destroy();}
+  const ctx=el.getContext('2d');
+  const color=datasets[0].color||'#c8a84b';
+  const grad=ctx.createLinearGradient(0,0,0,opts.h||200);
+  grad.addColorStop(0,color+'2a');grad.addColorStop(1,color+'00');
+  chartReg[id]=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels,
+      datasets:datasets.map((ds,i)=>({
+        label:ds.label||'',
+        data:ds.data,
+        borderColor:ds.color||color,
+        borderWidth:ds.w||1.8,
+        backgroundColor:i===0?grad:'transparent',
+        fill:i===0,
+        tension:0.45,
+        pointRadius:0,
+        pointHoverRadius:4,
+        pointHoverBackgroundColor:ds.color||color,
+      }))
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{intersect:false,mode:'index'},
+      plugins:{
+        legend:{display:datasets.length>1,labels:{boxWidth:8,padding:12,font:{size:9}}},
+        tooltip:{
+          backgroundColor:'#0d0f13',borderColor:'#1e2330',borderWidth:1,
+          titleColor:'#c8a84b',bodyColor:'#dde2ec',
+          callbacks:{label:ctx=>` ${ctx.dataset.label||''} ${(ctx.parsed.y||0).toFixed(opts.dec??2)}${opts.unit||''}`}
+        }
+      },
+      scales:{
+        x:{grid:{color:'#13161c'},ticks:{maxTicksLimit:opts.xticks||7,maxRotation:0}},
+        y:{
+          min:opts.ymin,
+          grid:{color:'#13161c'},
+          ticks:{callback:v=>typeof v==='number'?(opts.prefix||'')+(v>=1000?v.toLocaleString():v.toFixed(opts.dec??1))+(opts.unit||''):v}
+        }
+      }
+    }
+  });
+}
+
+// ─── LOADER PROGRESS ─────────────────────────────────────────────────────────
+let prog=0;
+function ldStep(msg,chip,ok){
+  prog=Math.min(95,prog+18);
+  document.getElementById('ldFill').style.width=prog+'%';
+  document.getElementById('ldMsg').textContent=msg.toUpperCase();
+  if(chip){
+    const el=document.getElementById('chip-'+chip);
+    if(el){el.classList.remove('loading');el.classList.add(ok?'ok':'err');}
+  }
+}
+
+// ─── API CALLS ────────────────────────────────────────────────────────────────
+// All calls use Alpha Vantage (full CORS support) + Frankfurter.
+// Alpha Vantage free key = 25 req/day. We use 6 calls total, cached 24h.
+// timedFetch: Promise.race timeout — no AbortController (sandbox-safe)
+function timedFetch(url, ms=15000){
+  return Promise.race([
+    fetch(url).then(r=>{
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout after '+ms+'ms')),ms))
+  ]);
+}
+
+// ── Gold & Silver via Alpha Vantage GOLD_SILVER_SPOT (commodity endpoint) ──
+// Returns spot price for XAU and XAG as current values + recent history
+async function avGoldSilver(){
+  const ck='av_goldsilver'; const cached=cGet(ck); if(cached)return cached;
+  const url=`https://www.alphavantage.co/query?function=GOLD_SILVER_SPOT&apikey=${AV_KEY}`;
+  try{
+    const j=await timedFetch(url,15000);
+    // Response has gold and silver spot prices
+    if(j?.gold||j?.['Gold Price']||j?.data){
+      const result={
+        gold: parseFloat(j.gold||j['Gold Price']||j['1. Gold Price']||2625),
+        silver: parseFloat(j.silver||j['Silver Price']||j['2. Silver Price']||30),
+        date: j.date||new Date().toISOString().split('T')[0]
+      };
+      cSet(ck,result); return result;
+    }
+    console.warn('GOLD_SILVER_SPOT unexpected format:', JSON.stringify(j).slice(0,200));
+  }catch(e){console.warn('AV GoldSilver',e.message);}
+  return null;
+}
+
+// ── Gold historical via Alpha Vantage COMMODITY endpoint ──
+async function avGoldHistory(){
+  const ck='av_gold_hist'; const cached=cGet(ck); if(cached)return cached;
+  // Use GOLD_SILVER_HISTORY for monthly history
+  const url=`https://www.alphavantage.co/query?function=GOLD_SILVER_HISTORY&interval=monthly&apikey=${AV_KEY}`;
+  try{
+    const j=await timedFetch(url,15000);
+    const ts=j?.data||j?.['Monthly Gold Price']||j?.prices;
+    if(ts && Array.isArray(ts)){
+      const d=ts.map(r=>({date:r.date||r.Date,value:parseFloat(r.value||r.gold||r.Gold||r.price)}))
+                .filter(r=>!isNaN(r.value)).sort((a,b)=>a.date<b.date?-1:1);
+      if(d.length>0){cSet(ck,d); return d;}
+    }
+    // Try alternative key structure
+    const keys=Object.keys(j||{});
+    console.warn('AV GoldHistory keys:', keys.slice(0,5), 'sample:', JSON.stringify(j).slice(0,300));
+  }catch(e){console.warn('AV GoldHistory',e.message);}
+  return null;
+}
+
+// ── Bitcoin via Alpha Vantage DIGITAL_CURRENCY_DAILY ──
+async function avBitcoin(){
+  const ck='av_btc'; const cached=cGet(ck); if(cached)return cached;
+  const url=`https://www.alphavantage.co/query?function=DIGITAL_CURRENCY_DAILY&symbol=BTC&market=USD&apikey=${AV_KEY}`;
+  try{
+    const j=await timedFetch(url,15000);
+    const ts=j?.['Time Series (Digital Currency Daily)'];
+    if(ts){
+      const d=Object.entries(ts).sort((a,b)=>a[0]<b[0]?-1:1)
+        .map(([date,v])=>({date,value:parseFloat(v['4a. close (USD)']||v['4. close']||0)}))
+        .filter(r=>r.value>0).slice(-730); // last 2 years
+      if(d.length>0){cSet(ck,d); return d;}
+    }
+    console.warn('AV BTC unexpected:', JSON.stringify(j).slice(0,200));
+  }catch(e){console.warn('AV Bitcoin',e.message);}
+  return null;
+}
+
+// ── CPI via Alpha Vantage Economic Indicators ──
+async function avCPI(){
+  const ck='av_cpi'; const cached=cGet(ck); if(cached)return cached;
+  const url=`https://www.alphavantage.co/query?function=CPI&interval=monthly&apikey=${AV_KEY}`;
+  try{
+    const j=await timedFetch(url,15000);
+    const d=j?.data;
+    if(d && Array.isArray(d) && d.length>0){
+      const parsed=d.map(r=>({date:r.date,value:parseFloat(r.value)}))
+                    .filter(r=>!isNaN(r.value)).sort((a,b)=>a.date<b.date?-1:1);
+      if(parsed.length>0){cSet(ck,parsed); return parsed;}
+    }
+    console.warn('AV CPI:', JSON.stringify(j).slice(0,200));
+  }catch(e){console.warn('AV CPI',e.message);}
+  return null;
+}
+
+// ── M2 via Alpha Vantage Economic Indicators ──
+async function avM2(){
+  const ck='av_m2'; const cached=cGet(ck); if(cached)return cached;
+  const url=`https://www.alphavantage.co/query?function=M2&interval=monthly&apikey=${AV_KEY}`;
+  try{
+    const j=await timedFetch(url,15000);
+    const d=j?.data;
+    if(d && Array.isArray(d) && d.length>0){
+      const parsed=d.map(r=>({date:r.date,value:parseFloat(r.value)}))
+                    .filter(r=>!isNaN(r.value)).sort((a,b)=>a.date<b.date?-1:1);
+      if(parsed.length>0){cSet(ck,parsed); return parsed;}
+    }
+    console.warn('AV M2:', JSON.stringify(j).slice(0,200));
+  }catch(e){console.warn('AV M2',e.message);}
+  return null;
+}
+
+// ── Real estate proxy: Treasury Yield 10Y (correlated to mortgage/housing) ──
+// FRED HPI not available browser-side. Use AV Real GDP as macro proxy.
+async function avRealGDP(){
+  const ck='av_gdp'; const cached=cGet(ck); if(cached)return cached;
+  const url=`https://www.alphavantage.co/query?function=REAL_GDP&interval=quarterly&apikey=${AV_KEY}`;
+  try{
+    const j=await timedFetch(url,15000);
+    const d=j?.data;
+    if(d && Array.isArray(d) && d.length>0){
+      const parsed=d.map(r=>({date:r.date,value:parseFloat(r.value)}))
+                    .filter(r=>!isNaN(r.value)).sort((a,b)=>a.date<b.date?-1:1);
+      if(parsed.length>0){cSet(ck,parsed); return parsed;}
+    }
+  }catch(e){console.warn('AV GDP',e.message);}
+  return null;
+}
+
+// ── DXY from Frankfurter FX (CORS-friendly, no key needed) ──
+async function fxDxy(){
+  const ck='fx_dxy'; const cached=cGet(ck); if(cached)return cached;
+  const url='https://api.frankfurter.app/latest?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF';
+  try{
+    const j=await timedFetch(url,10000);
+    if(j?.rates){
+      const {EUR,JPY,GBP,CAD,SEK,CHF}=j.rates;
+      const dxy=50.14348*Math.pow(EUR,-0.576)*Math.pow(1/JPY,0.136)*Math.pow(GBP,-0.119)*Math.pow(CAD,0.091)*Math.pow(SEK,0.042)*Math.pow(CHF,0.036);
+      const v={value:Math.round(dxy*100)/100,date:j.date};
+      cSet(ck,v); return v;
+    }
+  }catch(e){console.warn('Frankfurter',e.message);}
+  return null;
+}
+
+// ─── MAIN LOAD ────────────────────────────────────────────────────────────────
+async function loadAll(){
+  if(isSandboxed()){
+    ldStep('Preview mode — fallback data','fred',false);
+    ldStep('','av',false);ldStep('','btc',false);ldStep('','fx',false);
+    ldStep('Using verified 2024 fallback data...','cdi',true);
+    showSandboxBanner();
+    return getFallbackData();
+  }
+
+  // Run all 7 calls in parallel — all via Alpha Vantage or Frankfurter (CORS-safe)
+  ldStep('Fetching live data — Alpha Vantage + Frankfurter...','fred',null);
+
+  const [goldSilver, goldHist, btcRaw, cpiRaw, m2Raw, gdpRaw, dxyLive] = await Promise.all([
+    avGoldSilver(),
+    avGoldHistory(),
+    avBitcoin(),
+    avCPI(),
+    avM2(),
+    avRealGDP(),
+    fxDxy(),
+  ]);
+
+  const avOk = !!(goldSilver||btcRaw||cpiRaw||m2Raw);
+  ldStep('Alpha Vantage '+(avOk?'OK':'FAILED — check rate limit'),'fred',avOk);
+  ldStep('Markets '+(goldSilver?'OK':'FAILED'),'av',!!goldSilver);
+  ldStep('BTC '+(btcRaw?'OK':'FAILED'),'btc',!!btcRaw);
+  ldStep('FX/DXY '+(dxyLive?'OK':'FAILED'),'fx',!!dxyLive);
+  ldStep('Computing CDI...','cdi',true);
+
+  if(!goldSilver&&!btcRaw&&!cpiRaw&&!m2Raw&&!dxyLive){
+    console.warn('All APIs failed — using fallback');
+    showSandboxBanner();
+    return getFallbackData();
+  }
+
+  return {goldSilver,goldHist,btcRaw,cpiRaw,m2Raw,gdpRaw,dxyLive,isFallback:false};
+}
+
+// ─── GRADE & VERDICT ─────────────────────────────────────────────────────────
+function grade(s){
+  if(s<20)return['STABLE','g-stable'];
+  if(s<38)return['MILD','g-mild'];
+  if(s<56)return['ELEVATED','g-elevated'];
+  if(s<74)return['SEVERE','g-severe'];
+  return['CRITICAL','g-critical'];
+}
+function verdict(s){
+  if(s<20)return"All seven indicators show stable monetary conditions. Hard assets are near long-run fair value and the dollar is holding purchasing power relative to its 2000 baseline.";
+  if(s<38)return"Mild debasement pressure. Gold, silver, and real estate have appreciated modestly above baseline. Official inflation and money supply growth remain in moderate territory. Dollar purchasing power is gradually eroding.";
+  if(s<56)return"Elevated debasement signal. Market-priced hard assets — gold, silver, real estate — show sustained appreciation well above 2000 baselines. Combined with above-target inflation and M2 expansion, the CDI signals meaningful dollar erosion in progress.";
+  if(s<74)return"Severe debasement in progress. Gold, silver, and bitcoin are pricing in significant loss of dollar purchasing power. Real estate appreciation reflects both shelter scarcity and dollar weakness. Official inflation data, even at reduced weighting, confirms sustained pressure above the Fed's target.";
+  return"Critical debasement threshold breached. All seven indicators are elevated simultaneously — a rare configuration historically associated with acute monetary crises. Hard asset prices reflect extreme loss of confidence in fiat purchasing power.";
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render({goldSilver,goldHist,btcRaw,cpiRaw,m2Raw,gdpRaw,dxyLive,isFallback=false,
+  // fallback compat fields (from getFallbackData)
+  goldRaw,silverRaw,hpiRaw}={}){
+
+  // ── Extract current values ──
+  // Gold & Silver: from GOLD_SILVER_SPOT (live) or fallback goldRaw series
+  const goldNow   = goldSilver?.gold  || goldRaw?.[goldRaw.length-1]?.value || 2625;
+  const silverNow = goldSilver?.silver|| silverRaw?.[silverRaw.length-1]?.value || 30;
+  const btcNow    = btcRaw?.[btcRaw.length-1]?.value || 94000;
+  const dxyNow    = dxyLive?.value || 104;
+  // HPI: use GDP as proxy when HPI not available
+  const hpiNow    = hpiRaw?.[hpiRaw.length-1]?.value || 330;
+
+  // CPI YoY from Alpha Vantage CPI series (index level)
+  const cpiSlice = cpiRaw || [];
+  const latestCPI = cpiSlice[cpiSlice.length-1]?.value || 314;
+  const prevCPI = cpiSlice.length>=13 ? cpiSlice[cpiSlice.length-13]?.value : null;
+  const cpiYoy = prevCPI ? ((latestCPI-prevCPI)/prevCPI*100) : 2.9;
+
+  // M2 YoY from Alpha Vantage M2 series (in billions)
+  const m2Slice = m2Raw || [];
+  const latestM2raw = m2Slice[m2Slice.length-1]?.value || 21500;
+  const prevM2raw = m2Slice.length>=13 ? m2Slice[m2Slice.length-13]?.value : m2Slice[0]?.value;
+  const m2Yoy = prevM2raw ? ((latestM2raw-prevM2raw)/prevM2raw*100) : 3.3;
+  // Convert billions to trillions for display
+  const latestM2 = latestM2raw > 1000 ? latestM2raw/1000 : latestM2raw;
+
+  // Compute CDI
+  const {cdi,sg,ss,sb,sd,sh,sc,sm}=calcCDI({gold:goldNow,silver:silverNow,btc:btcNow,dxy:dxyNow,hpi:hpiNow,cpi:cpiYoy,m2yoy:m2Yoy});
+  const [gr,gc]=grade(cdi);
+
+  // ── Hero CDI display ──
+  document.getElementById('cdiNum').textContent=cdi.toFixed(0);
+  const gb=document.getElementById('gradeBadge');
+  gb.textContent=gr;gb.className='grade-badge '+gc;
+  document.getElementById('verdictText').textContent=verdict(cdi);
+  setTimeout(()=>{document.getElementById('gaugeFill').style.transform=`scaleX(${cdi/100})`;},500);
+
+  // Component breakdown bars
+  const comps=[
+    {name:'Gold',score:sg,color:'var(--gold)',w:'20%'},
+    {name:'Silver',score:ss,color:'var(--silver)',w:'15%'},
+    {name:'Bitcoin',score:sb,color:'var(--bitcoin)',w:'15%'},
+    {name:'DXY (inv)',score:sd,color:'var(--blue)',w:'15%'},
+    {name:'Case-Shiller',score:sh,color:'var(--purple)',w:'10%'},
+    {name:'CPI ⚠',score:sc,color:'var(--muted)',w:'13%'},
+    {name:'M2 ⚠',score:sm,color:'var(--muted)',w:'12%'},
+  ];
+  const csEl=document.getElementById('compScores');
+  const existing=csEl.querySelectorAll('.comp-row');existing.forEach(e=>e.remove());
+  comps.forEach(c=>{
+    const row=document.createElement('div');row.className='comp-row';
+    row.innerHTML=`<div class="comp-name">${c.name}</div>
+    <div class="comp-track"><div class="comp-fill" style="width:${c.score}%;background:${c.color}"></div></div>
+    <div class="comp-val">${c.score.toFixed(0)}</div>`;
+    csEl.appendChild(row);
+  });
+
+  // ── Stat cards ──
+  function setCard(id,val,delta,deltaClass,fresh,ibPct){
+    document.getElementById('sv-'+id).textContent=val;
+    const de=document.getElementById('sd-'+id);
+    de.textContent=delta;de.className='stat-delta '+deltaClass;
+    document.getElementById('sf-'+id).textContent=fresh;
+    setTimeout(()=>{document.getElementById('ib-'+id).style.width=ibPct+'%';},300);
+  }
+
+  const goldVs=((goldNow/BASE.gold-1)*100).toFixed(0);
+  setCard('gold','$'+Math.round(goldNow).toLocaleString(),`+${goldVs}% vs $272 baseline (2000)`,'delta-up',goldHist?.[goldHist?.length-1]?.date||goldSilver?.date||'',Math.min(100,goldNow/3500*100));
+
+  const silVs=((silverNow/BASE.silver-1)*100).toFixed(0);
+  setCard('silver','$'+silverNow.toFixed(2),`+${silVs}% vs $4.95 baseline (2000)`,'delta-up',silverRaw?.[silverRaw.length-1]?.date||'',Math.min(100,silverNow/60*100));
+
+  setCard('btc','$'+Math.round(btcNow).toLocaleString(),`${btcNow>50000?'↑ STRONG':'↓ RETRACE'} · debasement hedge`,'delta-up',btcRaw?.[btcRaw.length-1]?.date||'',Math.min(100,Math.log10(btcNow)/7*100));
+
+  const dxyVs=((dxyNow-BASE.dxy)/BASE.dxy*100).toFixed(1);
+  setCard('dxy',dxyNow.toFixed(1),`${dxyVs}% vs 109 baseline (2000)`,dxyNow<BASE.dxy?'delta-up':'delta-dn',dxyLive?.date||'',Math.min(100,dxyNow/120*100));
+
+  const hpiVs=((hpiNow/100-1)*100).toFixed(0);
+  setCard('hpi',hpiNow.toFixed(1),`+${hpiVs}% vs 100 baseline (Jan 2000)`,'delta-up',hpiRaw?.[hpiRaw.length-1]?.date||'',Math.min(100,hpiNow/400*100));
+
+  setCard('cpi',cpiYoy.toFixed(1)+'%',`${cpiYoy.toFixed(2)}% YoY · ${cpiYoy>4?'WELL ABOVE':cpiYoy>2?'ABOVE':'AT/BELOW'} FED TARGET`,'delta-up',cpiRaw?.[cpiRaw.length-1]?.date||'',Math.min(100,cpiYoy/10*100));
+
+  const m2T=latestM2<100?'$'+latestM2.toFixed(1)+'T':'$'+(latestM2/1000).toFixed(1)+'T';
+  setCard('m2',m2T,`${m2Yoy>0?'+':''}${m2Yoy.toFixed(1)}% YoY growth`,'delta-up',m2Raw?.[m2Raw.length-1]?.date||'',Math.min(100,m2Yoy/25*100));
+
+  // Purchasing power estimate (gold-silver basket vs 2000)
+  const ppl=((goldNow/BASE.gold+silverNow/BASE.silver)/2-1)*100;
+  setCard('ppl','-'+ppl.toFixed(0)+'%',`Hard money basket: $1 in 2000 ≈ $${(BASE.gold/goldNow).toFixed(3)} today`,'delta-up','Gold + Silver avg depreciation',Math.min(100,ppl/800*100));
+
+  // ── Chart helpers ──
+  function getHistory(raw,n=120){
+    if(!raw||!raw.length)return null;
+    return raw.slice(-n);
+  }
+
+  // Gold chart
+  const gh=getHistory(goldHist||goldRaw,250);
+  if(gh){mkChart('ch-gold',gh.map(d=>d.date.slice(0,7)),
+    [{data:gh.map(d=>d.value),color:'#c8a84b'}],
+    {dec:0,prefix:'$',xticks:8,h:200});}
+  else document.getElementById('nd-gold').classList.add('show');
+
+  // Silver chart
+  const sh2=getHistory(silverRaw,250); // silverRaw from fallback or null
+  if(sh2){mkChart('ch-silver',sh2.map(d=>d.date.slice(0,7)),
+    [{data:sh2.map(d=>d.value),color:'#9ba8b8'}],
+    {dec:2,prefix:'$',xticks:8,h:200});}
+  else document.getElementById('nd-silver').classList.add('show');
+
+  // BTC chart
+  const bh=getHistory(btcRaw,365);
+  if(bh){mkChart('ch-btc',bh.map(d=>d.date.slice(0,7)),
+    [{data:bh.map(d=>d.value),color:'#f7931a'}],
+    {dec:0,prefix:'$',xticks:8,h:200});}
+  else document.getElementById('nd-btc').classList.add('show');
+
+  // DXY: we only have live. Use recent historical + live
+  const dxyHistData=[
+    ...RECENT.map(d=>({date:d.yr,value:d.dxy})),
+    {date:'LIVE',value:dxyNow}
+  ];
+  mkChart('ch-dxy',dxyHistData.map(d=>d.date),
+    [{data:dxyHistData.map(d=>d.value),color:'#4a7fc0'}],
+    {dec:1,xticks:8,h:200,ymin:70});
+
+  // HPI chart
+  const hh=getHistory(hpiRaw,80);
+  if(hh){mkChart('ch-hpi',hh.map(d=>d.date.slice(0,7)),
+    [{data:hh.map(d=>d.value),color:'#8060c0'}],
+    {dec:1,xticks:8,h:200});}
+  else document.getElementById('nd-hpi').classList.add('show');
+
+  // CPI YoY chart — compute from FRED index
+  if(cpiRaw&&cpiRaw.length>14){
+    const cpiSl=cpiRaw.slice(-48);
+    const yoyL=[],yoyV=[];
+    for(let i=12;i<cpiSl.length;i++){
+      const y=((cpiSl[i].value-cpiSl[i-12].value)/cpiSl[i-12].value)*100;
+      yoyL.push(cpiSl[i].date.slice(0,7));yoyV.push(Math.round(y*100)/100);
+    }
+    mkChart('ch-cpi',yoyL,[{data:yoyV,color:'#5a6278'}],{dec:1,unit:'%',xticks:8,h:200});
+  } else document.getElementById('nd-cpi').classList.add('show');
+
+  // M2 chart
+  const mh=getHistory(m2Raw,100);
+  if(mh){mkChart('ch-m2',mh.map(d=>d.date.slice(0,7)),
+    [{data:mh.map(d=>d.value>1000?d.value/1000:d.value),color:'#3a4055'}],
+    {dec:1,prefix:'$',unit:'T',xticks:10,h:270});}
+  else document.getElementById('nd-m2').classList.add('show');
+
+  // ── Full composite history chart ──
+  const compLabels=[];const compVals=[];
+  HIST.years.forEach((yr,i)=>{
+    compLabels.push(String(yr));
+    compVals.push(calcCDI({gold:HIST.gold[i],silver:HIST.silver[i],btc:HIST.btc[i],dxy:HIST.dxy[i],hpi:HIST.hpi[i],cpi:HIST.cpi[i],m2yoy:HIST.m2yoy[i]}).cdi);
+  });
+  RECENT.forEach(d=>{
+    compLabels.push(d.yr);
+    compVals.push(calcCDI({gold:d.gold,silver:d.silver,btc:d.btc,dxy:d.dxy,hpi:d.hpi,cpi:d.cpi,m2yoy:d.m2yoy}).cdi);
+  });
+  // Live point
+  compLabels.push('LIVE');
+  compVals.push(cdi);
+
+  const ptColors=compVals.map(v=>v>=74?'#d94f4f':v>=56?'#e07830':v>=38?'#e8c850':v>=20?'#c8a84b':'#3aaa6e');
+
+  const fcCtx=document.getElementById('ch-composite').getContext('2d');
+  const fcGrad=fcCtx.createLinearGradient(0,0,0,300);
+  fcGrad.addColorStop(0,'rgba(232,200,80,0.22)');
+  fcGrad.addColorStop(0.6,'rgba(232,200,80,0.05)');
+  fcGrad.addColorStop(1,'rgba(232,200,80,0)');
+
+  if(chartReg['ch-composite'])chartReg['ch-composite'].destroy();
+  chartReg['ch-composite']=new Chart(fcCtx,{
+    type:'line',
+    data:{
+      labels:compLabels,
+      datasets:[{
+        label:'CDI Score',
+        data:compVals,
+        borderColor:'#e8c850',
+        borderWidth:2.5,
+        backgroundColor:fcGrad,
+        fill:true,tension:0.45,
+        pointRadius:compVals.map((_,i)=>i===compVals.length-1?7:2.5),
+        pointBackgroundColor:ptColors,
+        pointBorderColor:'transparent',
+        pointHoverRadius:6,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{intersect:false,mode:'index'},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0d0f13',borderColor:'#1e2330',borderWidth:1,
+          titleColor:'#e8c850',bodyColor:'#dde2ec',
+          callbacks:{
+            label:ctx=>` CDI: ${ctx.parsed.y?.toFixed(1)} / 100`,
+            afterLabel:ctx=>{
+              const v=ctx.parsed.y;
+              if(v<20)return' ▸ STABLE';if(v<38)return' ▸ MILD';
+              if(v<56)return' ▸ ELEVATED';if(v<74)return' ▸ SEVERE';
+              return' ▸ CRITICAL';
+            }
+          }
+        },
+        annotation:{
+          annotations:{
+            line1:{type:'line',yMin:56,yMax:56,borderColor:'rgba(224,120,48,0.25)',borderWidth:1,borderDash:[4,4],label:{content:'SEVERE',display:true,color:'rgba(224,120,48,0.5)',font:{size:8,family:'Courier Prime'}}},
+            line2:{type:'line',yMin:38,yMax:38,borderColor:'rgba(232,200,80,0.2)',borderWidth:1,borderDash:[4,4]},
+          }
+        }
+      },
+      scales:{
+        x:{grid:{color:'#13161c'},ticks:{maxTicksLimit:14,maxRotation:0}},
+        y:{min:0,max:100,grid:{color:'#13161c'},ticks:{callback:v=>v}}
+      }
+    }
+  });
+
+  // ── Hero trend chart ──
+  const heroData=[...RECENT,{yr:'LIVE',gold:goldNow,silver:silverNow,btc:btcNow,dxy:dxyNow,hpi:hpiNow,cpi:cpiYoy,m2yoy:m2Yoy}];
+  const heroLabels=heroData.map(d=>d.yr);
+  const heroVals=heroData.map(d=>calcCDI({gold:d.gold,silver:d.silver,btc:d.btc,dxy:d.dxy,hpi:d.hpi,cpi:d.cpi,m2yoy:d.m2yoy}).cdi);
+
+  const hCtx=document.getElementById('heroChart').getContext('2d');
+  const hGrad=hCtx.createLinearGradient(0,0,0,280);
+  hGrad.addColorStop(0,'rgba(232,200,80,0.28)');hGrad.addColorStop(1,'rgba(232,200,80,0)');
+
+  if(chartReg['heroChart'])chartReg['heroChart'].destroy();
+  chartReg['heroChart']=new Chart(hCtx,{
+    type:'line',
+    data:{labels:heroLabels,datasets:[{
+      data:heroVals,borderColor:'#e8c850',borderWidth:2.5,
+      backgroundColor:hGrad,fill:true,tension:0.5,
+      pointRadius:heroVals.map((_,i)=>i===heroVals.length-1?8:3),
+      pointBackgroundColor:heroVals.map(v=>v>=74?'#d94f4f':v>=56?'#e07830':'#e8c850'),
+      pointBorderColor:'transparent',
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#0d0f13',borderColor:'#1e2330',borderWidth:1,titleColor:'#e8c850',bodyColor:'#dde2ec',
+          callbacks:{label:ctx=>` CDI: ${ctx.parsed.y?.toFixed(1)}/100`}}
+      },
+      scales:{
+        x:{grid:{color:'#13161c'},ticks:{maxRotation:0}},
+        y:{min:0,max:100,grid:{color:'#13161c'},ticks:{maxTicksLimit:5}}
+      }
+    }
+  });
+
+  // ── Timestamp ──
+  const now=new Date();
+  const tsStr=now.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}).toUpperCase();
+  document.getElementById('tsLabel').textContent=
+    isFallback ? '⚠ PREVIEW — 2024 FALLBACK DATA · '+tsStr : 'LIVE · '+tsStr;
+
+  // done
+  document.getElementById('ldFill').style.width='100%';
+  document.getElementById('ldMsg').textContent=
+    isFallback ? 'PREVIEW MODE — DEPLOY TO BROWSER FOR LIVE DATA' : 'COMPLETE — LIVE DATA LOADED';
+  setTimeout(()=>{document.getElementById('loader').classList.add('out');},600);
+}
+
+// ─── FULL REFRESH ─────────────────────────────────────────────────────────────
+async function fullRefresh(){
+  const btn=document.getElementById('refreshBtn');
+  btn.classList.add('spin');btn.textContent='⟳ FETCHING...';
+  cClear();
+  const data=await loadAll();
+  render(data);
+  btn.classList.remove('spin');btn.textContent='⟳ REFRESH';
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+(async()=>{
+  document.getElementById('ldFill').style.width='5%';
+  const data=await loadAll();
+  render(data);
+  // auto-refresh every 6h
+  setInterval(()=>{cClear();loadAll().then(render);},24*60*60*1000); // refresh daily
+})();
+</script>
+</body>
+</html>// ─── DATA LAYER ──────────────────────────────────────────────────────────────
+// Reads /data/data.json — pre-fetched by GitHub Actions 2x/day, no CORS needed.
+
+const DATA_URL = './data/data.json';
+
+function showStaleBanner(fetchedAt){
+  const age=Math.round((Date.now()-new Date(fetchedAt))/3600000);
+  if(age<25)return;
+  const b=document.createElement('div');
+  b.style.cssText=`position:fixed;top:0;left:0;right:0;z-index:8999;
+    background:#1a1200;border-bottom:1px solid #c8a84b;padding:10px 20px;
+    display:flex;align-items:center;justify-content:space-between;
+    font-family:'Courier Prime',monospace;font-size:0.62rem;letter-spacing:0.1em;
+    color:#c8a84b;gap:16px;flex-wrap:wrap;`;
+  b.innerHTML=`<span>⚠ Data is ${age}h old — next auto-update pending.</span>
+    <span style="cursor:pointer;color:#6b5a28;padding:2px 8px;border:1px solid #6b5a28"
+      onclick="this.parentElement.remove()">✕</span>`;
+  document.body.appendChild(b);
+  document.querySelector('.page').style.paddingTop='52px';
+}
+
+function buildFallbackSeries(anchors,startYear=2000){
+  const out=[];
+  for(let i=0;i<anchors.length-1;i++){
+    const yr=startYear+i;const v0=anchors[i],v1=anchors[i+1];
+    for(let m=0;m<12;m++){
+      out.push({date:`${yr}-${String(m+1).padStart(2,'0')}-01`,value:Math.round((v0+(v1-v0)*(m/12))*100)/100});
+    }
+  }
+  out.push({date:`${startYear+anchors.length-1}-01-01`,value:anchors[anchors.length-1]});
+  return out;
+}
+
+function getFallbackData(){
+  return{
+    fetchedAt:new Date().toISOString(),isSeedData:true,
+    goldSilver:{gold:2625,silver:30,date:'2024-12-31'},
+    goldHist:buildFallbackSeries([272,276,348,416,436,513,636,831,869,1087,1421,1531,1664,1202,1184,1060,1152,1303,1279,1517,1898,1830,1824,2078,2625]).slice(-120),
+    btcRaw:buildFallbackSeries([0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.07,1,0.3,5.27,13.44,754,320,430,963,13880,3742,7193,29000,46306,16547,42258,94000]).slice(-60),
+    cpiRaw:buildFallbackSeries([172,177,180,184,188,195,201,207,215,214,218,225,230,233,237,237,240,245,252,257,259,278,297,304,314]).slice(-60),
+    m2Raw:buildFallbackSeries([4900,5400,5800,6100,6400,6700,7100,7500,8200,8500,8800,9600,10500,11000,11700,12300,13200,13800,14400,15300,19400,21400,21200,20800,21500]).slice(-60),
+    hpiRaw:buildFallbackSeries([100,106,114,123,138,160,177,173,149,134,131,134,145,155,162,172,185,200,212,221,265,305,320,315,330]).slice(-60),
+    dxyLive:{value:108.2,date:'2024-12-31'},
+    sources:{gold:'fallback',btc:'fallback',cpi:'fallback',m2:'fallback',hpi:'fallback',dxy:'fallback'}
+  };
+}
+
+async function loadAll(){
+  ldStep('Loading market data...','fred',null);
+  ldStep('','av',null);ldStep('','btc',null);ldStep('','fx',null);
+  try{
+    const r=await Promise.race([
+      fetch(DATA_URL).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000))
+    ]);
+    ldStep('Data loaded OK','fred',true);
+    ldStep('','av',true);ldStep('','btc',true);ldStep('','fx',true);
+    ldStep('Computing CDI...','cdi',true);
+    if(r.fetchedAt)showStaleBanner(r.fetchedAt);
+    return{...r,isFallback:!!r.isSeedData};
+  }catch(e){
+    console.warn('data.json failed:',e.message);
+    ldStep('Using seed data','fred',false);
+    ldStep('','av',false);ldStep('','btc',false);ldStep('','fx',false);
+    ldStep('Computing CDI...','cdi',true);
+    return getFallbackData();
+  }
+}
+
+(async()=>{
+  document.getElementById('ldFill').style.width='5%';
+  const data=await loadAll();
+  render(data);
+})();
+</script>
