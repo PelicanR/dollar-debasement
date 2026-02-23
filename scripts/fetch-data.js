@@ -6,23 +6,19 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 
-const FRED_KEY = process.env.FRED_KEY;
-const AV_KEY   = process.env.AV_KEY;
+const FRED_KEY    = process.env.FRED_KEY;
+const AV_KEY      = process.env.AV_KEY;
+const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
 
-async function get(url, label) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function get(url, label, headers={}) {
   try {
     console.log(`  Fetching ${label}...`);
-    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000), headers });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    if (j?.['Note'] || j?.['Information']) {
-      console.warn(`  ✗ ${label}: AV rate limit`);
-      return null;
-    }
-    if (j?.['Error Message']) {
-      console.warn(`  ✗ ${label}: AV error — ${j['Error Message'].slice(0,60)}`);
-      return null;
-    }
+    if (j?.['Note'] || j?.['Information']) { console.warn(`  ✗ ${label}: AV rate limit`); return null; }
+    if (j?.['Error Message'])              { console.warn(`  ✗ ${label}: ${j['Error Message'].slice(0,60)}`); return null; }
     console.log(`  ✓ ${label}`);
     return j;
   } catch (e) {
@@ -31,16 +27,26 @@ async function get(url, label) {
   }
 }
 
-async function fredSeries(series, limit = 80) {
-  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series}&sort_order=desc&limit=${limit}&file_type=json&api_key=${FRED_KEY}`;
-  const j = await get(url, `FRED ${series}`);
-  if (!j?.observations) return null;
-  return j.observations
-    .filter(o => o.value !== '.')
-    .map(o => ({ date: o.date, value: parseFloat(o.value) }))
-    .reverse();
+// ── Gold-API.com — gold, silver, BTC spot prices ──────────────────────────────
+async function goldApiSpot(symbol) {
+  const url = `https://www.goldapi.io/api/${symbol}/USD`;
+  const j = await get(url, `GoldAPI ${symbol}`, {
+    'x-access-token': GOLDAPI_KEY,
+    'Content-Type': 'application/json'
+  });
+  return j?.price ?? null;
 }
 
+async function getSpotPrices() {
+  const [gold, silver, btc] = await Promise.all([
+    goldApiSpot('XAU'),
+    goldApiSpot('XAG'),
+    goldApiSpot('BTC'),
+  ]);
+  return { gold, silver, btc };
+}
+
+// ── Alpha Vantage — monthly history series ────────────────────────────────────
 async function avCommodity(fn, label) {
   const url = `https://www.alphavantage.co/query?function=${fn}&interval=monthly&apikey=${AV_KEY}`;
   const j = await get(url, label);
@@ -51,52 +57,48 @@ async function avCommodity(fn, label) {
     .sort((a, b) => a.date < b.date ? -1 : 1);
 }
 
-async function avGoldSpot() {
-  const series = await avCommodity('GOLD', 'AV Gold monthly');
-  if (!series || !series.length) return null;
-  const silverSeries = await avCommodity('SILVER', 'AV Silver monthly');
-  const latest = series[series.length - 1];
-  const latestSilver = silverSeries?.[silverSeries.length - 1];
-  return {
-    gold:       latest.value,
-    silver:     latestSilver?.value || 0,
-    date:       latest.date,
-    goldHist:   series,
-    silverHist: silverSeries || [],
-  };
-}
-
-async function avBitcoin() {
-  const url = `https://www.alphavantage.co/query?function=DIGITAL_CURRENCY_MONTHLY&symbol=BTC&market=USD&apikey=${AV_KEY}`;
-  const j = await get(url, 'AV Bitcoin monthly');
-  const ts = j?.['Time Series (Digital Currency Monthly)'];
-  if (ts && Object.keys(ts).length > 0) {
-    const entries = Object.entries(ts)
-      .sort((a, b) => a[0] < b[0] ? -1 : 1)
-      .map(([date, v]) => {
-        const close = v['4a. close (USD)'] || v['4. close'] || v['4b. close (USD)'] || v['close'];
-        return { date, value: parseFloat(close || 0) };
-      })
-      .filter(r => r.value > 0);
-    if (entries.length > 0) return entries.slice(-60);
+// ── CoinCap — BTC price history (no key needed) ───────────────────────────────
+async function btcHistory() {
+  // Monthly close prices via CoinCap history endpoint (last 5 years)
+  const end   = Date.now();
+  const start = end - 5 * 365 * 24 * 60 * 60 * 1000;
+  const url   = `https://api.coincap.io/v2/assets/bitcoin/history?interval=m1&start=${start}&end=${end}`;
+  // m1 = monthly — too granular, use daily and downsample
+  const url2  = `https://api.coincap.io/v2/assets/bitcoin/history?interval=d1&start=${start}&end=${end}`;
+  const j = await get(url2, 'CoinCap BTC history');
+  if (!j?.data?.length) return null;
+  // Take last data point of each month
+  const monthly = {};
+  for (const pt of j.data) {
+    const mo = pt.date.slice(0, 7); // "YYYY-MM"
+    monthly[mo] = { date: pt.date.slice(0, 10), value: parseFloat(pt.priceUsd) };
   }
-  return null;
+  return Object.values(monthly).sort((a, b) => a.date < b.date ? -1 : 1).slice(-60);
 }
 
+// ── FRED ──────────────────────────────────────────────────────────────────────
+async function fredSeries(series, limit = 80) {
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series}&sort_order=desc&limit=${limit}&file_type=json&api_key=${FRED_KEY}`;
+  const j = await get(url, `FRED ${series}`);
+  if (!j?.observations) return null;
+  return j.observations
+    .filter(o => o.value !== '.')
+    .map(o => ({ date: o.date, value: parseFloat(o.value) }))
+    .reverse();
+}
+
+// ── DXY from Frankfurter ──────────────────────────────────────────────────────
 async function dxy() {
   const j = await get('https://api.frankfurter.app/latest?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF', 'Frankfurter DXY');
   if (!j?.rates) return null;
   const { EUR, JPY, GBP, CAD, SEK, CHF } = j.rates;
-  // Frankfurter: EUR=0.85 means 0.85 euros per dollar (USDEUR)
-  // Convert to standard convention: EURUSD=1/EUR, USDJPY=JPY, GBPUSD=1/GBP
   const EURUSD = 1 / EUR;
   const USDJPY = JPY;
   const GBPUSD = 1 / GBP;
   const USDCAD = CAD;
   const USDSEK = SEK;
   const USDCHF = CHF;
-  // ICE DXY formula. Constant 68.73 recalibrated for modern rate levels.
-  // (Original 50.14348 was set in 1973 when USDJPY~306; produces ~25 today)
+  // Constant 62.57 calibrated for modern rate levels (Feb 2025, DXY~97)
   const val = 62.57
     * Math.pow(EURUSD, -0.576)
     * Math.pow(USDJPY,  0.136)
@@ -108,41 +110,54 @@ async function dxy() {
   return { value: Math.round(val * 100) / 100, date: j.date };
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`\n=== Fetch — ${new Date().toUTCString()} ===\n`);
 
-  const [m2Raw, cpiRaw, hpiRaw, goldData, btcRaw, cpiAV, m2AV, dxyLive] = await Promise.all([
+  const [spot, m2Raw, cpiRaw, hpiRaw, goldHistAV, btcHist, cpiAV, m2AV, dxyLive] = await Promise.all([
+    getSpotPrices(),
     fredSeries('M2SL',       80),
     fredSeries('CPIAUCSL',   80),
     fredSeries('CSUSHPINSA', 80),
-    avGoldSpot(),
-    avBitcoin(),
-    avCommodity('CPI', 'AV CPI'),
-    avCommodity('M2',  'AV M2'),
+    avCommodity('GOLD', 'AV Gold history'),
+    btcHistory(),
+    avCommodity('CPI',  'AV CPI'),
+    avCommodity('M2',   'AV M2'),
     dxy(),
   ]);
 
-  const goldSilver = goldData ? { gold: goldData.gold, silver: goldData.silver, date: goldData.date } : null;
-  const goldHist   = goldData?.goldHist || null;
-  const finalCPI   = cpiRaw || cpiAV;
-  const finalM2    = m2Raw  || m2AV;
+  const goldSilver = (spot.gold && spot.silver)
+    ? { gold: spot.gold, silver: spot.silver, date: new Date().toISOString().split('T')[0] }
+    : null;
+
+  // Build BTC series: history + today's spot price appended
+  let btcRaw = btcHist || null;
+  if (btcRaw && spot.btc) {
+    const today = new Date().toISOString().split('T')[0];
+    btcRaw = [...btcRaw.filter(r => r.date < today), { date: today, value: spot.btc }];
+  } else if (spot.btc) {
+    btcRaw = [{ date: new Date().toISOString().split('T')[0], value: spot.btc }];
+  }
+
+  const finalCPI = cpiRaw || cpiAV;
+  const finalM2  = m2Raw  || m2AV;
 
   const data = {
     fetchedAt: new Date().toISOString(),
     goldSilver,
-    goldHist:  goldHist?.slice(-300),
+    goldHist:  goldHistAV?.slice(-300) || null,
     btcRaw:    btcRaw?.slice(-60),
     cpiRaw:    finalCPI?.slice(-80),
     m2Raw:     finalM2?.slice(-80),
     hpiRaw:    hpiRaw?.slice(-80),
     dxyLive,
     sources: {
-      gold: goldSilver ? 'alpha_vantage' : 'fallback',
-      btc:  btcRaw     ? 'alpha_vantage' : 'fallback',
-      cpi:  cpiRaw     ? 'fred' : (cpiAV ? 'alpha_vantage' : 'fallback'),
-      m2:   m2Raw      ? 'fred' : (m2AV  ? 'alpha_vantage' : 'fallback'),
-      hpi:  hpiRaw     ? 'fred' : 'fallback',
-      dxy:  dxyLive    ? 'frankfurter' : 'fallback',
+      gold: goldSilver  ? 'goldapi'      : 'fallback',
+      btc:  btcRaw      ? 'coincap'      : 'fallback',
+      cpi:  cpiRaw      ? 'fred'         : (cpiAV ? 'alpha_vantage' : 'fallback'),
+      m2:   m2Raw       ? 'fred'         : (m2AV  ? 'alpha_vantage' : 'fallback'),
+      hpi:  hpiRaw      ? 'fred'         : 'fallback',
+      dxy:  dxyLive     ? 'frankfurter'  : 'fallback',
     }
   };
 
@@ -152,14 +167,15 @@ async function main() {
 
   console.log('\n=== Summary ===');
   console.log('Sources:', data.sources);
-  console.log(`Gold:    ${data.goldSilver?.gold ?? 'fallback'}`);
-  console.log(`Silver:  ${data.goldSilver?.silver ?? 'fallback'}`);
-  console.log(`BTC pts: ${data.btcRaw?.length ?? 0}`);
-  console.log(`CPI pts: ${data.cpiRaw?.length ?? 0}`);
-  console.log(`M2 pts:  ${data.m2Raw?.length ?? 0}`);
-  console.log(`HPI pts: ${data.hpiRaw?.length ?? 0}`);
-  console.log(`DXY:     ${data.dxyLive?.value ?? 'fallback'}`);
+  console.log(`Gold:    ${data.goldSilver?.gold    ?? 'fallback'}`);
+  console.log(`Silver:  ${data.goldSilver?.silver  ?? 'fallback'}`);
+  console.log(`BTC:     ${spot.btc                 ?? 'fallback'}`);
+  console.log(`BTC pts: ${data.btcRaw?.length      ?? 0}`);
+  console.log(`CPI pts: ${data.cpiRaw?.length      ?? 0}`);
+  console.log(`M2 pts:  ${data.m2Raw?.length       ?? 0}`);
+  console.log(`HPI pts: ${data.hpiRaw?.length      ?? 0}`);
+  console.log(`DXY:     ${data.dxyLive?.value      ?? 'fallback'}`);
+  console.log(`\nWrote ${fs.statSync(outPath).size} bytes -> ${outPath}`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
-
