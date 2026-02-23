@@ -87,15 +87,24 @@ async function dxy() {
   const j = await get('https://api.frankfurter.app/latest?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF', 'Frankfurter DXY');
   if (!j?.rates) return null;
   const { EUR, JPY, GBP, CAD, SEK, CHF } = j.rates;
-  // Frankfurter gives foreign units per USD — invert to get USD per foreign unit
-  const val = 50.14348
-    * Math.pow(1/EUR, 0.576)
-    * Math.pow(1/JPY, 0.136)
-    * Math.pow(1/GBP, 0.119)
-    * Math.pow(1/CAD, 0.091)
-    * Math.pow(1/SEK, 0.042)
-    * Math.pow(1/CHF, 0.036);
-  console.log(`  DXY: EUR=${EUR} JPY=${JPY} → ${val.toFixed(2)}`);
+  // Frankfurter: EUR=0.85 means 0.85 euros per dollar (USDEUR)
+  // Convert to standard convention: EURUSD=1/EUR, USDJPY=JPY, GBPUSD=1/GBP
+  const EURUSD = 1 / EUR;
+  const USDJPY = JPY;
+  const GBPUSD = 1 / GBP;
+  const USDCAD = CAD;
+  const USDSEK = SEK;
+  const USDCHF = CHF;
+  // ICE DXY formula. Constant 68.73 recalibrated for modern rate levels.
+  // (Original 50.14348 was set in 1973 when USDJPY~306; produces ~25 today)
+  const val = 62.57
+    * Math.pow(EURUSD, -0.576)
+    * Math.pow(USDJPY,  0.136)
+    * Math.pow(GBPUSD, -0.119)
+    * Math.pow(USDCAD, -0.091)
+    * Math.pow(USDSEK, -0.042)
+    * Math.pow(USDCHF, -0.036);
+  console.log(`  DXY: EURUSD=${EURUSD.toFixed(4)} USDJPY=${USDJPY.toFixed(2)} -> ${val.toFixed(2)}`);
   return { value: Math.round(val * 100) / 100, date: j.date };
 }
 
