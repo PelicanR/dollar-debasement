@@ -2,30 +2,38 @@ name: Fetch Market Data
 
 on:
   schedule:
-    - cron: '0 7 * * *'
-    - cron: '0 19 * * *'
-  workflow_dispatch:
+    - cron: '0 7 * * *'   # 7:00 AM UTC (3 AM ET)
+    - cron: '0 19 * * *'  # 7:00 PM UTC (3 PM ET)
+  workflow_dispatch:       # allow manual trigger from GitHub UI
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write      # allow committing data.json back to repo
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install node-fetch@3
+
+      - name: Install dependencies
+        run: npm install node-fetch@3
+
       - name: Fetch all market data
         env:
           FRED_KEY: ${{ secrets.FRED_KEY }}
           AV_KEY: ${{ secrets.AV_KEY }}
+          GOLDAPI_KEY: ${{ secrets.GOLDAPI_KEY }}
         run: node scripts/fetch-data.js
+
       - name: Commit updated data
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data/data.json
           git diff --staged --quiet || git commit -m "data: update $(date -u '+%Y-%m-%d %H:%M UTC')"
