@@ -26,25 +26,30 @@ async function get(url, label, headers={}) {
   }
 }
 
-// ── Kraken — spot prices for gold (XAUUSD), silver (XAGUSD), BTC (XBTUSD) ────
-// No API key required, no IP restrictions, completely free
-async function krakenSpot(pair, label) {
-  const url = `https://api.kraken.com/0/public/Ticker?pair=${pair}`;
-  const j = await get(url, `Kraken ${label}`);
-  if (j?.error?.length) { console.warn(`  ✗ Kraken ${label}: ${j.error[0]}`); return null; }
-  if (!j?.result) return null;
-  const key = Object.keys(j.result)[0];
-  const close = parseFloat(j.result[key]?.c?.[0]);
-  console.log(`  Kraken ${label} raw: key=${key} close=${close}`);
+// ── Metals.live — gold & silver spot (free, no key, no restrictions) ─────────
+async function metalSpot(metal) {
+  // metals.live returns array of {metal, price, currency}
+  const j = await get(`https://metals.live/api/spot/${metal}`, `metals.live ${metal}`);
+  if (!j?.price) return null;
+  return parseFloat(j.price);
+}
+
+// ── Kraken — BTC spot price only ─────────────────────────────────────────────
+async function krakenBtcSpot() {
+  const url = 'https://api.kraken.com/0/public/Ticker?pair=XBTUSD';
+  const j = await get(url, 'Kraken BTC spot');
+  if (j?.error?.length) { console.warn(`  ✗ Kraken BTC: ${j.error[0]}`); return null; }
+  const key = Object.keys(j?.result || {})[0];
+  const close = parseFloat(j?.result?.[key]?.c?.[0]);
+  console.log(`  Kraken BTC raw: key=${key} close=${close}`);
   return close > 0 ? close : null;
 }
 
 async function getSpotPrices() {
-  // Kraken uses XXAUXXUSD for gold, XXAGXXUSD for silver
   const [gold, silver, btc] = await Promise.all([
-    krakenSpot('XXAUXXUSD', 'Gold spot'),
-    krakenSpot('XXAGXXUSD', 'Silver spot'),
-    krakenSpot('XBTUSD',    'BTC spot'),
+    metalSpot('gold'),
+    metalSpot('silver'),
+    krakenBtcSpot(),
   ]);
   console.log(`  Spot prices: gold=${gold} silver=${silver} btc=${btc}`);
   return { gold, silver, btc };
