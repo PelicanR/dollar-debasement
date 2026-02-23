@@ -31,18 +31,22 @@ async function get(url, label, headers={}) {
 async function krakenSpot(pair, label) {
   const url = `https://api.kraken.com/0/public/Ticker?pair=${pair}`;
   const j = await get(url, `Kraken ${label}`);
+  if (j?.error?.length) { console.warn(`  ✗ Kraken ${label}: ${j.error[0]}`); return null; }
   if (!j?.result) return null;
   const key = Object.keys(j.result)[0];
   const close = parseFloat(j.result[key]?.c?.[0]);
+  console.log(`  Kraken ${label} raw: key=${key} close=${close}`);
   return close > 0 ? close : null;
 }
 
 async function getSpotPrices() {
+  // Kraken uses XXAUXXUSD for gold, XXAGXXUSD for silver
   const [gold, silver, btc] = await Promise.all([
-    krakenSpot('XAUUSD', 'Gold spot'),
-    krakenSpot('XAGUSD', 'Silver spot'),
-    krakenSpot('XBTUSD', 'BTC spot'),
+    krakenSpot('XXAUXXUSD', 'Gold spot'),
+    krakenSpot('XXAGXXUSD', 'Silver spot'),
+    krakenSpot('XBTUSD',    'BTC spot'),
   ]);
+  console.log(`  Spot prices: gold=${gold} silver=${silver} btc=${btc}`);
   return { gold, silver, btc };
 }
 
@@ -150,8 +154,8 @@ async function main() {
     hpiRaw:    hpiRaw?.slice(-80),
     dxyLive,
     sources: {
-      gold: goldSilver  ? 'goldapi'      : 'fallback',
-      btc:  btcRaw      ? 'coincap'      : 'fallback',
+      gold: goldSilver  ? 'kraken'       : 'fallback',
+      btc:  btcRaw      ? 'kraken'       : 'fallback',
       cpi:  cpiRaw      ? 'fred'         : (cpiAV ? 'alpha_vantage' : 'fallback'),
       m2:   m2Raw       ? 'fred'         : (m2AV  ? 'alpha_vantage' : 'fallback'),
       hpi:  hpiRaw      ? 'fred'         : 'fallback',
