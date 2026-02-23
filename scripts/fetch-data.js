@@ -8,7 +8,6 @@ import path from 'path';
 
 const FRED_KEY    = process.env.FRED_KEY;
 const AV_KEY      = process.env.AV_KEY;
-const GOLDAPI_KEY = process.env.GOLDAPI_KEY;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function get(url, label, headers={}) {
@@ -27,21 +26,22 @@ async function get(url, label, headers={}) {
   }
 }
 
-// ── Gold-API.com — gold, silver, BTC spot prices ──────────────────────────────
-async function goldApiSpot(symbol) {
-  const url = `https://www.goldapi.io/api/${symbol}/USD`;
-  const j = await get(url, `GoldAPI ${symbol}`, {
-    'x-access-token': GOLDAPI_KEY,
-    'Content-Type': 'application/json'
-  });
-  return j?.price ?? null;
+// ── Kraken — spot prices for gold (XAUUSD), silver (XAGUSD), BTC (XBTUSD) ────
+// No API key required, no IP restrictions, completely free
+async function krakenSpot(pair, label) {
+  const url = `https://api.kraken.com/0/public/Ticker?pair=${pair}`;
+  const j = await get(url, `Kraken ${label}`);
+  if (!j?.result) return null;
+  const key = Object.keys(j.result)[0];
+  const close = parseFloat(j.result[key]?.c?.[0]);
+  return close > 0 ? close : null;
 }
 
 async function getSpotPrices() {
   const [gold, silver, btc] = await Promise.all([
-    goldApiSpot('XAU'),
-    goldApiSpot('XAG'),
-    goldApiSpot('BTC'),
+    krakenSpot('XAUUSD', 'Gold spot'),
+    krakenSpot('XAGUSD', 'Silver spot'),
+    krakenSpot('XBTUSD', 'BTC spot'),
   ]);
   return { gold, silver, btc };
 }
