@@ -1144,10 +1144,27 @@ async function fullRefresh(){
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 (async()=>{
   document.getElementById('ldFill').style.width='5%';
-  const data=await loadAll();
-  render(data);
-  // auto-refresh every 6h
-  setInterval(()=>{cClear();loadAll().then(render);},24*60*60*1000); // refresh daily
+  try{
+    const data=await loadAll();
+    try{
+      render(data);
+    }catch(renderErr){
+      // Show render error visibly on screen
+      console.error('RENDER ERROR:', renderErr);
+      document.getElementById('ldMsg').textContent='RENDER ERROR: '+renderErr.message;
+      document.getElementById('ldMsg').style.color='#d94f4f';
+      document.getElementById('ldFill').style.background='#d94f4f';
+      document.getElementById('ldFill').style.width='100%';
+      // Also show in a visible div
+      const errDiv=document.createElement('div');
+      errDiv.style.cssText='position:fixed;bottom:20px;left:20px;right:20px;background:#1a0a0a;border:1px solid #d94f4f;padding:16px;font-family:monospace;font-size:12px;color:#d94f4f;z-index:9999;white-space:pre-wrap;max-height:300px;overflow-y:auto;';
+      errDiv.textContent='RENDER ERROR:\n'+renderErr.stack;
+      document.body.appendChild(errDiv);
+    }
+  }catch(loadErr){
+    console.error('LOAD ERROR:', loadErr);
+    document.getElementById('ldMsg').textContent='LOAD ERROR: '+loadErr.message;
+  }
 })();
 </script>
 </body>
