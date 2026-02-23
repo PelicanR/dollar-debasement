@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-02-23T13:41:50.281Z",
+  "fetchedAt": "2026-02-23T13:57:59.955Z",
   "goldSilver": null,
   "cpiRaw": [
     {
@@ -964,7 +964,7 @@
     }
   ],
   "dxyLive": {
-    "value": 25.69,
+    "value": 97.61,
     "date": "2026-02-20"
   },
   "sources": {
