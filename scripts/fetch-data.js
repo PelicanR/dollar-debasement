@@ -37,6 +37,15 @@ async function fredSeries(series, limit=80) {
     .reverse();
 }
 
+// ── gold-api.com — free, no key, no rate limits, CORS enabled ───────────────
+// Endpoint: GET https://api.gold-api.com/price/{symbol}
+async function goldApiPrice(symbol) {
+  const j = await get(`https://api.gold-api.com/price/${symbol}`, `gold-api.com ${symbol}`);
+  if (!j?.price) return null;
+  console.log(`  gold-api.com ${symbol}: $${j.price}`);
+  return j.price;
+}
+
 // ── Kraken — BTC spot + history (no key needed) ───────────────────────────────
 async function krakenBtcSpot() {
   const j = await get('https://api.kraken.com/0/public/Ticker?pair=XBTUSD', 'Kraken BTC spot');
@@ -80,8 +89,8 @@ async function main() {
   console.log(`\n=== Fetch — ${new Date().toUTCString()} ===\n`);
 
   const [
-    goldRaw,    // FRED GOLDAMGBD228NLBM — daily gold, USD/troy oz, back to 1968
-    silverRaw,  // FRED SLVPRUSD         — daily silver, USD/troy oz, back to 1986
+    goldSpot,   // gold-api.com XAU spot price
+    silverSpot, // gold-api.com XAG spot price
     m2Raw,      // FRED M2SL
     cpiRaw,     // FRED CPIAUCSL
     hpiRaw,     // FRED CSUSHPINSA
@@ -91,8 +100,8 @@ async function main() {
     m2AV,       // AV M2 fallback
     dxyLive,    // Frankfurter DXY
   ] = await Promise.all([
-    fredSeries('GOLDAMGBD228NLBM', 500),
-    fredSeries('SLVPRUSD',         500),
+    goldApiPrice('XAU'),
+    goldApiPrice('XAG'),
     fredSeries('M2SL',              80),
     fredSeries('CPIAUCSL',          80),
     fredSeries('CSUSHPINSA',        80),
@@ -103,13 +112,12 @@ async function main() {
     dxy(),
   ]);
 
-  // Gold spot = latest FRED value
-  const latestGold   = goldRaw?.[goldRaw.length-1];
-  const latestSilver = silverRaw?.[silverRaw.length-1];
-  const goldSilver   = latestGold ? {
-    gold:   latestGold.value,
-    silver: latestSilver?.value || null,
-    date:   latestGold.date,
+  // Gold/silver spot from gold-api.com
+  const today      = new Date().toISOString().split('T')[0];
+  const goldSilver = goldSpot ? {
+    gold:   goldSpot,
+    silver: silverSpot || null,
+    date:   today,
   } : null;
 
   // BTC: history + append live spot as today's point
@@ -126,15 +134,15 @@ async function main() {
   const data = {
     fetchedAt: new Date().toISOString(),
     goldSilver,
-    goldHist:  goldRaw?.slice(-300)  || null,  // full history for chart
+    goldHist:  null,  // no free historical gold data source currently
     btcRaw:    btcRaw?.slice(-60),
     cpiRaw:    finalCPI?.slice(-80),
     m2Raw:     finalM2?.slice(-80),
     hpiRaw:    hpiRaw?.slice(-80),
     dxyLive,
     sources: {
-      gold:   goldSilver ? 'fred'        : 'fallback',
-      silver: latestSilver ? 'fred'      : 'fallback',
+      gold:   goldSilver ? 'gold-api.com' : 'fallback',
+      silver: silverSpot  ? 'gold-api.com' : 'fallback',
       btc:    btcRaw     ? 'kraken'      : 'fallback',
       cpi:    cpiRaw     ? 'fred'        : (cpiAV ? 'alpha_vantage' : 'fallback'),
       m2:     m2Raw      ? 'fred'        : (m2AV  ? 'alpha_vantage' : 'fallback'),
@@ -149,8 +157,8 @@ async function main() {
 
   console.log('\n=== Summary ===');
   console.log('Sources:', data.sources);
-  console.log(`Gold:    $${data.goldSilver?.gold   ?? 'fallback'} (${latestGold?.date ?? '-'})`);
-  console.log(`Silver:  $${data.goldSilver?.silver ?? 'fallback'} (${latestSilver?.date ?? '-'})`);
+  console.log(`Gold:    $${data.goldSilver?.gold   ?? 'fallback'}`);
+  console.log(`Silver:  $${data.goldSilver?.silver ?? 'fallback'}`);
   console.log(`BTC:     $${btcSpot                 ?? 'fallback'}`);
   console.log(`BTC pts: ${data.btcRaw?.length      ?? 0}`);
   console.log(`CPI pts: ${data.cpiRaw?.length      ?? 0}`);
