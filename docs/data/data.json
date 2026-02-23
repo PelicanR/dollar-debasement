@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-02-23T14:42:42.477Z",
+  "fetchedAt": "2026-02-23T14:54:02.406Z",
   "goldSilver": null,
   "goldHist": null,
   "btcRaw": [
@@ -97,7 +97,7 @@
     },
     {
       "date": "2026-02-23",
-      "value": 65657.8
+      "value": 66016.2
     }
   ],
   "cpiRaw": [
