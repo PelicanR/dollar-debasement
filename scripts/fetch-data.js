@@ -57,21 +57,19 @@ async function avCommodity(fn, label) {
     .sort((a, b) => a.date < b.date ? -1 : 1);
 }
 
-// ── CoinCap — BTC price history (no key needed) ───────────────────────────────
+// ── Kraken — BTC monthly price history (no key, no network restrictions) ─────
 async function btcHistory() {
-  // Monthly close prices via CoinCap history endpoint (last 5 years)
-  const end   = Date.now();
-  const start = end - 5 * 365 * 24 * 60 * 60 * 1000;
-  const url   = `https://api.coincap.io/v2/assets/bitcoin/history?interval=m1&start=${start}&end=${end}`;
-  // m1 = monthly — too granular, use daily and downsample
-  const url2  = `https://api.coincap.io/v2/assets/bitcoin/history?interval=d1&start=${start}&end=${end}`;
-  const j = await get(url2, 'CoinCap BTC history');
-  if (!j?.data?.length) return null;
-  // Take last data point of each month
+  // Kraken OHLC: interval=1440 = daily candles, last 720 days
+  const url = 'https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440';
+  const j = await get(url, 'Kraken BTC history');
+  const candles = j?.result?.XXBTZUSD || j?.result?.XBTUSD;
+  if (!candles?.length) return null;
+  // Downsample to monthly (take last candle of each month)
   const monthly = {};
-  for (const pt of j.data) {
-    const mo = pt.date.slice(0, 7); // "YYYY-MM"
-    monthly[mo] = { date: pt.date.slice(0, 10), value: parseFloat(pt.priceUsd) };
+  for (const c of candles) {
+    const date = new Date(c[0] * 1000).toISOString().split('T')[0]; // unix -> YYYY-MM-DD
+    const mo   = date.slice(0, 7);
+    monthly[mo] = { date, value: parseFloat(c[4]) }; // c[4] = close price
   }
   return Object.values(monthly).sort((a, b) => a.date < b.date ? -1 : 1).slice(-60);
 }
