@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-02-23T14:54:02.406Z",
+  "fetchedAt": "2026-02-23T15:01:32.091Z",
   "goldSilver": null,
   "goldHist": null,
   "btcRaw": [
@@ -97,7 +97,7 @@
     },
     {
       "date": "2026-02-23",
-      "value": 66016.2
+      "value": 66020
     }
   ],
   "cpiRaw": [
@@ -1063,12 +1063,12 @@
     }
   ],
   "dxyLive": {
-    "value": 97.61,
-    "date": "2026-02-20"
+    "value": 97.49,
+    "date": "2026-02-23"
   },
   "sources": {
     "gold": "fallback",
-    "btc": "coincap",
+    "btc": "kraken",
     "cpi": "fred",
     "m2": "fred",
     "hpi": "fred",
