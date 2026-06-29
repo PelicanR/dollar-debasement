@@ -1,6 +1,10 @@
 {
-  "fetchedAt": "2026-06-28T20:10:10.006Z",
-  "goldSilver": null,
+  "fetchedAt": "2026-06-29T12:01:28.682Z",
+  "goldSilver": {
+    "gold": 4041.5,
+    "silver": 58.305,
+    "date": "2026-06-29"
+  },
   "goldHist": null,
   "btcRaw": [
     {
@@ -96,8 +100,8 @@
       "value": 73570
     },
     {
-      "date": "2026-06-28",
-      "value": 59466.1
+      "date": "2026-06-29",
+      "value": 59573.8
     }
   ],
   "cpiRaw": [
@@ -1067,8 +1071,8 @@
     "date": "2026-06-26"
   },
   "sources": {
-    "gold": "fallback",
-    "silver": "fallback",
+    "gold": "gold-api.com",
+    "silver": "gold-api.com",
     "btc": "kraken",
     "cpi": "fred",
     "m2": "fred",
