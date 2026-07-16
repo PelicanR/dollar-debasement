@@ -1,8 +1,8 @@
 {
-  "fetchedAt": "2026-07-16T09:17:33.201Z",
+  "fetchedAt": "2026-07-16T20:00:04.914Z",
   "goldSilver": {
-    "gold": 4037.899902,
-    "silver": 57.216,
+    "gold": 3980,
+    "silver": 55.806999,
     "date": "2026-07-16"
   },
   "goldHist": null,
@@ -105,7 +105,7 @@
     },
     {
       "date": "2026-07-16",
-      "value": 64081.4
+      "value": 64213.7
     }
   ],
   "cpiRaw": [
@@ -1071,8 +1071,8 @@
     }
   ],
   "dxyLive": {
-    "value": 99.38,
-    "date": "2026-07-15"
+    "value": 99.05,
+    "date": "2026-07-16"
   },
   "sources": {
     "gold": "gold-api.com",
